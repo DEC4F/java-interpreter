@@ -35,12 +35,10 @@
          (else 'false) ))
       ;check while statement
       ((eq? (car statement) 'while) (M_while (car (cdr statement)) (car (cddr statement)) state))
-
-      ;need assign declare
+      ((eq? (car statement) 'var) M_declare (cdr statement) state)
 
       )))
       
-
 ; evaluate the while statement returns state
 (define M_while
   (lambda (condition expression state)
@@ -55,7 +53,7 @@
       ((eq? condition 'true) #t)
       ((eq? condition 'false) #f)
       ((atom? condition) (find condition (car state) (car (cdr state))))
-      ((eq? (car condition) '==) (= (M_value (car (cdr condition)) state) (M_value (car (cddr condition)) state)))
+      ((eq? (car condition) '==) (eq? (M_value (car (cdr condition)) state) (M_value (car (cddr condition)) state)))
       ((eq? (car condition) '>) (> (M_value (car (cdr condition)) state) (M_value (car (cddr condition)) state)))
       ((eq? (car condition) '<) (< (M_value (car (cdr condition)) state) (M_value (car (cddr condition)) state)))
       ((eq? (car condition) '>=) (or (= (M_value (car (cdr condition)) state) (M_value (car (cddr condition)) state))
@@ -66,6 +64,44 @@
       ((eq? (car condition) '||) (or (M_boolean (car (cdr condition)) state) (M_boolean (car (cddr condition)) state)))
       ((eq? (car condition) '&&) (and (M_boolean (car (cdr condition)) state) (M_boolean (car (cddr condition)) state)))
       ((eq? (car condition) '!) (not (M_boolean (cdr condition) state))) )))
+
+; calculate the arithmetic expressions and return the number after calculation
+(define M_value
+  (lambda (expression state)
+    (cond
+      ((null? expression) ())
+      ((number? expression) expression)
+      ((atom? expression) (find expression (car state) (car (cdr state))))
+      ((eq? (car expression) '+) (+ (M_value (car (cdr expression)) state) (M_value (car (cdr (cdr expression))) state)))
+      ((eq? (car expression) '-) (cond
+                                   ((eq? (cdr (cdr expression)) '()) (- 0 (M_value (car (cdr expression)) state)))
+                                   (else (- (M_value (car (cdr expression)) state) (M_value (car (cdr (cdr expression))) state))) ))
+      ((eq? (car expression) '*) (* (M_value (car (cdr expression)) state) (M_value (car (cdr (cdr expression))) state)))
+      ((eq? (car expression) '/) (quotient (M_value (car (cdr expression)) state) (M_value (car (cdr (cdr expression))) state)))
+      ((eq? (car expression) '%) (remainder (M_value (car (cdr expression)) state) (M_value (car (cddr expression)) state)))
+      ((number? (car expression)) (car expression))
+      ((atom? (car expression)) (find (car expression) (car state) (car (cdr state))))
+      ((list? (car expression)) (M_value (car expression) state)) )))
+
+(define M_declare
+  (lambda (statement state)
+    (cond
+      ; edge case: var already declared
+      ((declared? (car statement) (car state)) (error "This variable has already been declared."))
+      ; case 1: declare a var but not assign any value
+      ((null? (cdr statement)) (add (car statement) '() (car state) (cadr state)))
+      ; case 2: declare a var and assign a boolean to it
+      ((isBooleanOperation? (cadr statement) (car state) (cadr state))
+        (add (car statement) (M_boolean (cadr statement) state) (car state) (cadr state)))
+      ; case 3: declare a var and assign the val of another var to it
+      ((and (list? (cadr statement)) (eq? (car (cadr statement)) '=))
+        (add (car statement) (find (cadr (cadr statement))
+                                   (car (M_state (cadr statement) state))
+                                   (cadr (M_state (cadr statement) state))) ; find the val associated with the var
+                             (car (M_state (cadr statement) state))
+                             (cadr (M_state (cadr statement) state)) )) ; add val & name to state lists
+      ; case 4: declare a var and assign num or an expression to it
+      (else (add (car statement) (M_value (cadr statement) state) (car state) (cadr state))) )))
 
 ; check the expression is boolean or numeric, #t if is boolean
 (define isBooleanOperation
@@ -93,30 +129,12 @@
       ((list? (car expression)) (isBooleanOperation (car expression) namelist valuelist))
       (else #f) )))
 
-; calculate the arithmetic expressions and return the number after calculation
-(define M_value
-  (lambda (expression state)
-    (cond
-      ((null? expression) ())
-      ((number? expression) expression)
-      ((atom? expression) (find expression (car state) (car (cdr state))))
-      ((eq? (car expression) '+) (+ (M_value (car (cdr expression)) state) (M_value (car (cdr (cdr expression))) state)))
-      ((eq? (car expression) '-) (cond
-                                   ((eq? (cdr (cdr expression)) '()) (- 0 (M_value (car (cdr expression)) state)))
-                                   (else (- (M_value (car (cdr expression)) state) (M_value (car (cdr (cdr expression))) state))) ))
-      ((eq? (car expression) '*) (* (M_value (car (cdr expression)) state) (M_value (car (cdr (cdr expression))) state)))
-      ((eq? (car expression) '/) (/ (M_value (car (cdr expression)) state) (M_value (car (cdr (cdr expression))) state)))
-      ((eq? (car expression) '%) (remainder (M_value (car (cdr expression)) state) (M_value (car (cddr expression)) state)))
-      ((number? (car expression)) (car expression))
-      ((atom? (car expression)) (find (car expression) (car state) (car (cdr state))))
-      ((list? (car expression)) (M_value (car expression) state)) )))
-
-; find the value by given name if not declared or not initialized return error
+; find the value by given name, return error when not declared or not initialized 
 (define find
   (lambda (name namelist valuelist)
     (cond
       ((declared? name namelist) (initialized? name namelist valuelist))
-      (else (error "error: you need to declare first")) )))
+      (else (error "error: you need to declare a variable first")) )))
 
 ; check if the name is declared
 (define declared?
@@ -156,5 +174,3 @@
 (define atom?
   (lambda (x)
     (and (not (pair? x)) (not (null? x))) ))
-
-; isaojdasjdsadjkgk
