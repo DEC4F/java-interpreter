@@ -1,5 +1,5 @@
 ; Group 69
-; Member: Shihong Ling, Yuhang Li, Xiangda Tian
+; Member: Shihong Ling, Yuhang Li, Stanley Tian
 
 ; include parse tree
 (load "simpleParser.scm")
@@ -8,7 +8,6 @@
 (define interpret
   (lambda (file)
     (evaluate (parser file) '(() ())) ))
-
 
 ; evaluate the statemet in the parse tree if every statement is evaluated, return the state which will store the output
 (define evaluate
