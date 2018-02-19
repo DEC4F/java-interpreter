@@ -35,7 +35,9 @@
          (else 'false) ))
       ;check while statement
       ((eq? (car statement) 'while) (M_while (cadr statement) (car (cddr statement)) state))
-      ((eq? (car statement) 'var) M_declare (cdr statement) state) )))
+      ; check declare statement
+      ((eq? (car statement) 'var) M_declare (cdr statement) state)
+      ((eq? (car statement) '=) (M_assign (cadr statement) (car (cddr (statement))) (car state) (cadr state))) )))
       
 ; evaluate the while statement returns state
 (define M_while
@@ -107,10 +109,6 @@
       ((number? expression) #f)
       ((boolean? expression) #t)
       ((atom? expression) (isBooleanOperation (find expression namelist valuelist) namelist valuelist))
-      ((eq? (car expression) '+) #f)
-      ((eq? (car expression) '-) #f)
-      ((eq? (car expression) '*) #f)
-      ((eq? (car expression) '/) #f)
       ((eq? (car expression) '&&) #t)
       ((eq? (car expression) '||) #t)
       ((eq? (car expression) '!) #t)
