@@ -111,6 +111,7 @@
       ; edge case: expression is null
       ((null? expression) 
         (error "Error Code: NULL_ASSIGNMENT"))
+      ; case 1: expression contains nested expression, including use of var
       ((and (list? expression) (eq? (car expression) '=)) 
         (M_assign name 
                   (find_val (cadr expression)
@@ -118,13 +119,13 @@
                             (cadr (M_state expression (cons namelist (cons valuelist '())))))
                   (car (M_state expression (cons namelist (cons valuelist '()))))
                   (cadr (M_state expression (cons namelist (cons valuelist '()))))))
-      ; case 1: expression is boolean
+      ; case 2: expression is boolean
       ((isBooleanOperation expression namelist valuelist) 
         (add name 
              (M_boolean expression (cons namelist (cons valuelist '())))
              (car (clear name namelist valuelist)) 
              (cadr (clear name namelist valuelist)) ))
-      ; case 2: expression is a numerical expression/number
+      ; case 3: expression is a numerical expression/number
       (else (add name 
                  (M_value expression (cons namelist (cons valuelist '())))
                  (car (clear name namelist valuelist)) 
@@ -197,3 +198,5 @@
 (define isAtom
   (lambda (x)
     (and (not (pair? x)) (not (null? x))) ))
+
+(interpret "Test_21.txt")
