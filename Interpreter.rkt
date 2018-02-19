@@ -229,5 +229,3 @@
 (define isAtom
   (lambda (x)
     (and (not (pair? x)) (not (null? x))) ))
-
-(interpret "Test_21.txt")
