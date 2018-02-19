@@ -20,7 +20,7 @@
 (define M_state
   (lambda (statement state)
     (cond
-      ((null? statement) (error "Empty statement"))
+      ((null? statement) (error "Error Code: EMPTY_STATEMENT"))
       ;check if statement
       ((eq? (car statement) 'if)
        (cond
@@ -85,7 +85,7 @@
   (lambda (statement state)
     (cond
       ; edge case: var already declared
-      ((isDeclared (car statement) (car state)) (error "This variable has already been declared."))
+      ((isDeclared (car statement) (car state)) (error "Error Code: REDEFINING_VARIABLE"))
       ; case 1: declare a var but not assign any value
       ((null? (cdr statement)) (add (car statement) '() (car state) (cadr state)))
       ; case 2: declare a var and assign a boolean to it
@@ -107,10 +107,10 @@
     (cond
       ; edge case: var not declared
       ((not (isDeclared name namelist))
-        (error "error: using before declaring"))
+        (error "Error Code: USING_BEFORE_DECLARING"))
       ; edge case: expression is null
       ((null? expression) 
-        (error "error: null assignment is currently not supported"))
+        (error "Error Code: NULL_ASSIGNMENT"))
       ((and (list? expression) (eq? (car expression) '=)) 
         (M_assign name 
                   (find_val (cadr expression)
@@ -156,7 +156,7 @@
 (define find_val
   (lambda (name namelist valuelist)
     (if (not (isDeclared name namelist))
-      (error "error: you need to declare a variable first")
+      (error "Error Code: USING_BEFORE_DECLARING")
       (isInitialized name namelist valuelist) )))
 
 ; check if the name is declared
@@ -171,11 +171,11 @@
 (define isInitialized
   (lambda (name namelist valuelist)
     (cond
-      ((null? namelist) (error "variable is not declared"))
+      ((null? namelist) (error "Error Code: USING_BEFORE_DECLARING"))
       ((eq? name (car namelist))
             (cond
               ((not (null? (car valuelist))) (car valuelist))
-              (else (error "error: variable has not been assigned a value" ))))
+              (else (error "Error Code: USING_BEFORE_ASSIGNING" ))))
       (else (isInitialized name (cdr namelist) (cdr valuelist))) )))
 
 ; clear the previously assigned name and value of the variable, add the new ones later
