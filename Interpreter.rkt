@@ -1,5 +1,7 @@
 ; Group 69
 ; Member: Shihong Ling, Yuhang Li, Stanley Tian
+; Basic tests: Test 1~20 work well
+; Extra challengings: Test_21 and Test_25 work well, Test_22 is almost right, Test_24 26 27 28 still do not work
 
 ; include parse tree
 (load "simpleParser.scm")
@@ -20,23 +22,25 @@
 (define M_state
   (lambda (statement state)
     (cond
+      ;Edge case: no statement, return error
       ((null? statement) (error "Error Code: EMPTY_STATEMENT"))
-      ;check if statement
+      ;Case 1: check if statement
       ((eq? (car statement) 'if)
        (cond
          ((M_boolean (cadr statement) state) (M_state (caddr statement) state))
          ((null? (cdddr statement)) state)
          (else (M_state (cadddr statement) state))))
-      ;check return statement
+      ;Case 2: check return statement
       ((eq? (car statement) 'return)
        (cond
          ((not (isBooleanOperation (cadr statement) (car state) (cadr state))) (M_value (cadr statement) state))
          ((M_boolean (cadr statement) state) 'true)
          (else 'false) ))
-      ;check while statement
+      ;Case 3: check while statement
       ((eq? (car statement) 'while) (M_while (cadr statement) (caddr statement) state))
-      ; check declare statement
+      ;Case 4: check declare statement
       ((eq? (car statement) 'var) (M_declare (cdr statement) state))
+      ;Case 5: check assign statement
       ((eq? (car statement) '=) (M_assign (cadr statement) (caddr statement) (car state) (cadr state))) )))
       
 ; evaluate the while statement returns state
@@ -46,39 +50,64 @@
       ((M_boolean condition state) (M_while condition expression (M_state expression state)))
       (else state) )))
 
-; evaluates the condition, 
+; evaluates the condition
 (define M_boolean
   (lambda (condition state)
     (cond
+      ;Case 1: condition is true
       ((eq? condition 'true) #t)
+      ;Case 2: condition is false
       ((eq? condition 'false) #f)
+      ;Case 3: condition is a variable
       ((isAtom condition) (find_val condition (car state) (cadr state)))
+      ;Case 4: condition is the result of ==
       ((eq? (car condition) '==) (eq? (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ;Case 5: condition is the result of >
       ((eq? (car condition) '>) (> (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ;Case 6: condition is the result of <
       ((eq? (car condition) '<) (< (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ;Case 7: condition is the result of >=
       ((eq? (car condition) '>=) (>= (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ;Case 8: condition is the reult of <=
       ((eq? (car condition) '<=) (<= (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ;Case 9: condition is the result of !=
       ((eq? (car condition) '!=) (not (= (M_value (cadr condition) state) (M_value (caddr condition) state))))
+      ;Case 10: condition is the result of ||
       ((eq? (car condition) '||) (or (M_boolean (cadr condition) state) (M_boolean (caddr condition) state)))
+      ;Case 11: condition is the result of &&
       ((eq? (car condition) '&&) (and (M_boolean (cadr condition) state) (M_boolean (caddr condition) state)))
+      ;Case 12: condition is the result of !
       ((eq? (car condition) '!) (not (M_boolean (cdr condition) state))) )))
 
 ; calculate the arithmetic expressions and return the number after calculation
 (define M_value
   (lambda (expression state)
     (cond
+      ;Base Case: no expression, return empty
       ((null? expression) ())
+      ;Case 1: the value is the number
       ((number? expression) expression)
+      ;Case 2: the value is the value of the variable
       ((isAtom expression) (find_val expression (car state) (cadr state)))
+      ;Case 3: the value is the result of +
       ((eq? (car expression) '+) (+ (M_value (cadr expression) state) (M_value (caddr expression) state)))
+      ;Case 4: the value is the result of -
       ((eq? (car expression) '-) (cond
                                    ((eq? (cddr expression) '()) (- 0 (M_value (cadr expression) state)))
                                    (else (- (M_value (cadr expression) state) (M_value (caddr expression) state))) ))
+      ;Case 5: the value is the result of *
       ((eq? (car expression) '*) (* (M_value (cadr expression) state) (M_value (caddr expression) state)))
+      ;Case 6: the value is the result of quotient
       ((eq? (car expression) '/) (quotient (M_value (cadr expression) state) (M_value (caddr expression) state)))
+      ;Case 7: the value is the result of remainder
       ((eq? (car expression) '%) (remainder (M_value (cadr expression) state) (M_value (caddr expression) state)))
+      ;Case 8: this is for when we have "=" in a expression
+      ((eq? (car expression) '=) (M_value (cadr expression) (M_state expression state)) )
+      ;Case 9: the value is the number wrapped in ()
       ((number? (car expression)) (car expression))
+      ;Case 10: the value is the value of variable wrapped in ()
       ((isAtom (car expression)) (find_val (car expression) (car state) (cadr state)))
+      ;Case 11: the value is the value of the element inside list
       ((list? (car expression)) (M_value (car expression) state)) )))
 
 (define M_declare
@@ -130,6 +159,8 @@
                  (car (clear name namelist valuelist)) 
                  (cadr (clear name namelist valuelist)))) )))
 
+
+; following functions are the helper methods
 ; check the expression is boolean or numeric, #t if is boolean
 (define isBooleanOperation
   (lambda (expression namelist valuelist)
@@ -193,7 +224,7 @@
   (lambda (name value namelist valuelist)
     (cons (cons name namelist) (cons (cons value valuelist) '())) ))
 
-; isAtom
+; isAtom, check whether the element is an atom
 (define isAtom
   (lambda (x)
     (and (not (pair? x)) (not (null? x))) ))
