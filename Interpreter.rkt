@@ -24,9 +24,9 @@
       ;check if statement
       ((eq? (car statement) 'if)
        (cond
-         ((M_boolean (cadr statement) state) (M_state (car (cddr statement)) state))
-         ((null? (cdr (cdr (cdr statement)))) state)
-         (else (M_state (car (cdddr statement)) state))))
+         ((M_boolean (cadr statement) state) (M_state (caddr statement) state))
+         ((null? (cdddr statement)) state)
+         (else (M_state (cadddr statement) state))))
       ;check return statement
       ((eq? (car statement) 'return)
        (cond
@@ -34,10 +34,10 @@
          ((M_boolean (cadr statement) state) 'true)
          (else 'false) ))
       ;check while statement
-      ((eq? (car statement) 'while) (M_while (cadr statement) (car (cddr statement)) state))
+      ((eq? (car statement) 'while) (M_while (cadr statement) (caddr statement) state))
       ; check declare statement
       ((eq? (car statement) 'var) (M_declare (cdr statement) state))
-      ((eq? (car statement) '=) (M_assign (cadr statement) (car (cddr statement)) (car state) (cadr state))) )))
+      ((eq? (car statement) '=) (M_assign (cadr statement) (caddr statement) (car state) (cadr state))) )))
       
 ; evaluate the while statement returns state
 (define M_while
@@ -53,14 +53,14 @@
       ((eq? condition 'true) #t)
       ((eq? condition 'false) #f)
       ((isAtom condition) (find_val condition (car state) (cadr state)))
-      ((eq? (car condition) '==) (eq? (M_value (cadr condition) state) (M_value (car (cddr condition)) state)))
-      ((eq? (car condition) '>) (> (M_value (cadr condition) state) (M_value (car (cddr condition)) state)))
-      ((eq? (car condition) '<) (< (M_value (cadr condition) state) (M_value (car (cddr condition)) state)))
-      ((eq? (car condition) '>=) (>= (M_value (cadr condition) state) (M_value (car (cddr condition)) state)))
-      ((eq? (car condition) '<=) (<= (M_value (cadr condition) state) (M_value (car (cddr condition)) state)))
-      ((eq? (car condition) '!=) (not (= (M_value (cadr condition) state) (M_value (car (cddr condition)) state))))
-      ((eq? (car condition) '||) (or (M_boolean (cadr condition) state) (M_boolean (car (cddr condition)) state)))
-      ((eq? (car condition) '&&) (and (M_boolean (cadr condition) state) (M_boolean (car (cddr condition)) state)))
+      ((eq? (car condition) '==) (eq? (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ((eq? (car condition) '>) (> (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ((eq? (car condition) '<) (< (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ((eq? (car condition) '>=) (>= (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ((eq? (car condition) '<=) (<= (M_value (cadr condition) state) (M_value (caddr condition) state)))
+      ((eq? (car condition) '!=) (not (= (M_value (cadr condition) state) (M_value (caddr condition) state))))
+      ((eq? (car condition) '||) (or (M_boolean (cadr condition) state) (M_boolean (caddr condition) state)))
+      ((eq? (car condition) '&&) (and (M_boolean (cadr condition) state) (M_boolean (caddr condition) state)))
       ((eq? (car condition) '!) (not (M_boolean (cdr condition) state))) )))
 
 ; calculate the arithmetic expressions and return the number after calculation
@@ -70,13 +70,13 @@
       ((null? expression) ())
       ((number? expression) expression)
       ((isAtom expression) (find_val expression (car state) (cadr state)))
-      ((eq? (car expression) '+) (+ (M_value (cadr expression) state) (M_value (car (cddr expression)) state)))
+      ((eq? (car expression) '+) (+ (M_value (cadr expression) state) (M_value (caddr expression) state)))
       ((eq? (car expression) '-) (cond
                                    ((eq? (cddr expression) '()) (- 0 (M_value (cadr expression) state)))
-                                   (else (- (M_value (cadr expression) state) (M_value (car (cddr expression)) state))) ))
-      ((eq? (car expression) '*) (* (M_value (cadr expression) state) (M_value (car (cddr expression)) state)))
-      ((eq? (car expression) '/) (quotient (M_value (cadr expression) state) (M_value (car (cddr expression)) state)))
-      ((eq? (car expression) '%) (remainder (M_value (cadr expression) state) (M_value (car (cddr expression)) state)))
+                                   (else (- (M_value (cadr expression) state) (M_value (caddr expression) state))) ))
+      ((eq? (car expression) '*) (* (M_value (cadr expression) state) (M_value (caddr expression) state)))
+      ((eq? (car expression) '/) (quotient (M_value (cadr expression) state) (M_value (caddr expression) state)))
+      ((eq? (car expression) '%) (remainder (M_value (cadr expression) state) (M_value (caddr expression) state)))
       ((number? (car expression)) (car expression))
       ((isAtom (car expression)) (find_val (car expression) (car state) (cadr state)))
       ((list? (car expression)) (M_value (car expression) state)) )))
@@ -92,10 +92,10 @@
       ((isBooleanOperation (cadr statement) (car state) (cadr state))
         (add (car statement) (M_boolean (cadr statement) state) (car state) (cadr state)))
       ; case 3: declare a var and assign the val of another var to it
-      ((and (list? (cadr statement)) (eq? (car (cadr statement)) '=))
+      ((and (list? (cadr statement)) (eq? (caadr statement) '=))
         (add (car statement) (find_val (cadr (cadr statement))
-                                   (car (M_state (cadr statement) state))
-                                   (cadr (M_state (cadr statement) state))) ; find the val associated with the var
+                                       (car (M_state (cadr statement) state))
+                                       (cadr (M_state (cadr statement) state))) ; find the val associated with the var
                              (car (M_state (cadr statement) state))
                              (cadr (M_state (cadr statement) state)) )) ; add val & name to state lists
       ; case 4: declare a var and assign num or an expression to it
