@@ -45,16 +45,13 @@
       ;Case 5: check assign statement
       ((eq? (first statement) '=) (M_assign statement state return cont break throw))
       ;Case 6: check throw
-      ((eq? (first statement) 'throw) (throw (second statement) state))
+      ((eq? 'throw (first statement)) (throw (second statement) state))
       ;Case 7: check break
-      ((eq? (first statement) 'break) (break state))
+      ((eq? 'break (first statement)) (break state))
       ;Case 8: check continue
-      ((eq? (first statement) 'continue) (cont state))
+      ((eq? 'continue (first statement)) (cont state))
       ;Case 9: check begin
-      ((eq? (first statement) 'begin) (M_block statement state return cont break throw))
-      ;Case 10: check tey catch finally
-      ((eq? (first statement) 'try) (M_try statement state return cont break throw))
-      ;Case 11: else situation
+      ((eq? 'begin (first statement)) (M_block statement state return cont break throw))
       (else state)
       )))
       
@@ -170,29 +167,7 @@
   (lambda (statement state return cont break throw)
     (pop_layer (M_statement_list (rest statement) (push_layer state) return (lambda (w) (cont (pop_layer w))) (lambda (w) (break (pop_layer w))) (lambda (w s) (throw w (pop_layer s)))))))
 
-
-(define M_try
-  (lambda (statement state return cont break throw)
-    (cond
-      ((not (hascatch? statement)) (M_state (finallybody statement) (M_state (trybody statement) state return cont break throw) return cont break throw))
-      ((not (hasfinally? statement))
-       (call/cc
-        (lambda (new_throw)
-          (M_state (trybody statement) state return cont break (lambda (e new_state) (new_throw (M_catch (catchbody statement) e (errorName statement) state return cont break throw))))
-          )))
-      (else (M_state (finallybody statement)
-                     (call/cc
-                      (lambda (new_throw)
-                        (M_state (trybody statement) state return cont break (lambda (e new_state) (new_throw (M_catch (catchbody statement) e (errorName statement) state return cont break throw))))))
-                     return break cont throw)))))
-
-(define M_catch
-  (lambda (statement error errorName state return cont break throw)
-      (M_state statement (add_to_state errorName error state) return cont break throw)))
-
-    
-
-; ------------------------------------------------HELPERS-----------------------------------------------------------
+; ---------------------------------------HELPERS--------------------------------
 ; Check if the name is declared
 (define isDeclared
   (lambda (statement state)
@@ -228,20 +203,3 @@
 (define break cadr)
 (define cont caddr)
 (define throw cadddr)
-
-(define trybody cadr)
-(define catchbody
-  (lambda (statement)
-    (cdr (cdaddr statement))))
-(define finallybody
-  (lambda (statement)
-    (cadr (cadddr statement))))
-(define hascatch?
-  (lambda (statement)
-    (not (null? (caddr statement)))))
-(define hasfinally?
-  (lambda (statement)
-    (not (null? (cadddr statement)))))
-(define errorName
-  (lambda (statement)
-    (caar (cdaddr statement))))
