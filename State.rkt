@@ -11,13 +11,13 @@
 ;remove upmost layer 
 (define pop_layer
   (lambda (s)
-    (cdr s)))
+    (rest s)))
 
 ; Update the current state by adding a variable and value to the layer. 
 (define add_to_state
   (lambda (var value s)
     (if (eq? 'undeclared value)
-        (error "ERROR: Undeclared Variable" var)
+        (error "Error Code: USING_BEFORE_DECLARING" var)
         (call/cc
          (lambda (break)
            (add_to_state_help var value s (lambda () (break (cons (add_to_layer var value (first s)) (rest s))))))))))
@@ -41,9 +41,7 @@
        (cons (append (first s) (cons var '())) (cons (append (second s) (cons value '())) '())))
       ((eq? (car (first s)) var)
        (cons (first s)  (cons (cons value (cdr (second s))) '())) )
-      (else (cons (cons (car (first s)) (car (add_to_layer var value (cons (cdr (first s))
-                                                                                        (cons (cdr (second s)) '()))) )) (cons (cons (car (second s)) (car (cdr (add_to_layer var value
-                                                                                                                                                                                          (cons (cdr (first s)) (cons (cdr (second s)) '()))) ))) '()) )))))
+      (else (cons (cons (car (first s)) (car (add_to_layer var value (cons (cdr (first s)) (cons (cdr (second s)) '()))) )) (cons (cons (car (second s)) (car (cdr (add_to_layer var value (cons (cdr (first s)) (cons (cdr (second s)) '()))) ))) '()) )))))
 ; Helper method used by addtos
 (define add_to_state_help
   (lambda (var value s break)

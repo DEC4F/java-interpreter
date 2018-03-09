@@ -1,7 +1,5 @@
-; Group 69
+; Group 3
 ; Member: Shihong Ling, Yuhang Li, Stanley Tian
-; Basic tests: Test 1~20 work well
-; Extra challengings: Test_21 and Test_25 work well, Test_22 is almost right, Test_24 26 27 28 still do not work
 
 ; include parse tree
 (load "simpleParser.scm")
@@ -13,7 +11,7 @@
     (evaluate
      (call/cc
       (lambda (return)
-        (M_state (parser file) (base) return (lambda (v) (error "ERROR: Invalid Continue")) (lambda (v) (error "ERROR: Invalid Break")) (lambda (v) (error: "ERROR: Unexpected Error" v)))
+        (M_state (parser file) (base) return (lambda (v1) (error "Error Code: INVALID_CONTINUE")) (lambda (v2) (error "Error Code: INVALID_BREAK")) (lambda (v3) (error: "Error Code: UNKNOWN_ERROR" v3)))
         )))))
 
 ; evaluate the statemet in the parse tree if every statement is evaluated, return the state which will store the output
@@ -22,8 +20,8 @@
     (cond
       ((eq? x #t) 'true)
       ((eq? x #f) 'false)
-      ((eq? x 'undeclared) (error "ERROR: Undeclared variable!"))
-      ((eq? x 'uninitialized) (error "ERROR: Uninitialized variable!")) 
+      ((eq? x 'undeclared) (error "Error Code: USING_BEFORE_DECLARING"))
+      ((eq? x 'uninitialized) (error "Error Code: USING_BEFORE_ASSIGNING"))
       (else x))))
 
 ; check each type of statement and update the state
@@ -60,15 +58,16 @@
 ;interprets list of statement
 (define M_statement_list
   (lambda (statements state return cont break throw)
-    (if (null? statements) state
-        (M_statement_list (rest statements) (M_state (first statements) state return cont break throw) return cont break throw))))
+    (if (null? statements) 
+      state
+      (M_statement_list (rest statements) (M_state (first statements) state return cont break throw) return cont break throw))))
 
 ;interprets if statement
 (define M_if
   (lambda (statement state return cont break throw)
     (cond
-      ((isDeclared statement state) (error 'variableUndeclared "ERROR: Undeclared variable"))
-      ((isInit statement state) (error 'variableUninitialized "ERROR: Uninitialized variable"))
+      ((isDeclared statement state) (error 'variableUndeclared "Error Code: USING_BEFORE_DECLARING"))
+      ((isInit statement state) (error 'variableUninitialized "Error Code: USING_BEFORE_ASSIGNING"))
       ((M_value (second statement) state) (M_state (third statement) state return cont break throw))
       ((hasElse? statement) (M_state (else_branch statement) state return cont break throw))
       (else state))))
@@ -92,14 +91,14 @@
       ((null? (second expression)) (M_value (first statement) state))
 
       ;not sure
-      ((or (eq? 'uninitialized (M_value (second expression) state)) (eq? 'undeclared (M_value (second expression) state))) (error "ERROR: Variable not declared or initialized"))
-      ((and (not (null? (cddr expression))) (or (eq? 'uninitialized (M_value (third expression) state)) (eq? 'undeclared (M_value (third expression) state)))) (error "ERROR: Variable not declared or initialized!"))
+      ((or (eq? 'uninitialized (M_value (second expression) state)) (eq? 'undeclared (M_value (second expression) state))) (error "Error Code: UNDEFINED_OR_UNINITIALIZED_VARIABLE"))
+      ((and (not (null? (rest_after_two expression))) (or (eq? 'uninitialized (M_value (third expression) state)) (eq? 'undeclared (M_value (third expression) state)))) (error "Error Code: UNDEFINED_OR_UNINITIALIZED_VARIABLE"))
       
       ;Case 4: the value is the result of +
-      ((eq? (operator expression) '+) (+ (M_value (cadr expression) state) (M_value (caddr expression) state)))
+      ((eq? (operator expression) '+) (+ (M_value (second expression) state) (M_value (third expression) state)))
       ;Case 5: the value is the result of -
       ((eq? (operator expression) '-) (cond
-                                   ((eq? (cddr expression) '()) (- 0 (M_value (second expression) state)))
+                                   ((eq? (rest_after_two expression) '()) (- 0 (M_value (second expression) state)))
                                    (else (- (M_value (second expression) state) (M_value (third expression) state))) ))
       ;Case 6: the value is the result of *
       ((eq? (operator expression) '*) (* (M_value (second expression) state) (M_value (third expression) state)))
@@ -150,18 +149,18 @@
 
 ; evaluate the while statement returns state
 (define M_while
-  (lambda (condition body state return cont break throw)
+  (lambda (predicate body state return cont break throw)
     (call/cc
       (lambda (break2)
-        (letrec ((while_loop (lambda (condition body state return cont break throw)
-          (if (M_value condition state)
-            (while_loop condition body
+        (letrec ((while_loop (lambda (predicate body state return cont break throw)
+          (if (M_value predicate state)
+            (while_loop predicate body
               (call/cc 
                 (lambda (cont2) 
                   (M_state body state return cont2 break throw)))
-               return cont break throw)
+              return cont break throw)
             state))))
-          (while_loop condition body state return cont break2 throw) )))))
+          (while_loop predicate body state return cont break2 throw) )))))
 
 ; process a block of code
 (define M_block
