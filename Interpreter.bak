@@ -32,28 +32,40 @@
     (cond
       ;Edge case 1: empty statement
       ((null? statement) state)
+      
       ;Edge case 2: statement is an atom
       ((isAtom statement) state)
+      
       ;Case 0; check list of statements
       ((list? (first statement)) (M_statement_list statement state return cont break throw))
+      
       ;Case 1: check if statement
       ((eq? (first statement) 'if) (M_if statement state return cont break throw))
+
       ;Case 2: check return statement
       ((eq? (first statement) 'return) (M_return statement state return cont break throw))
+      
       ;Case 3: check while statement
-      ((eq? (first statement) 'while) (M_while (second statement) (third statement) state return cont break throw))
+      ;((eq? (car statement) 'while) (M_while statement state return cont break throw))
+      
       ;Case 4: check declare statement
       ((eq? (first statement) 'var) (M_declare statement state return cont break throw))
+      
       ;Case 5: check assign statement
       ((eq? (first statement) '=) (M_assign statement state return cont break throw))
+
       ;Case 6: check throw
       ((eq? 'throw (first statement)) (throw (second statement) state))
+
       ;Case 7: check break
       ((eq? 'break (first statement)) (break state))
+
       ;Case 8: check continue
       ((eq? 'continue (first statement)) (cont state))
+
       ;Case 9: check begin
       ((eq? 'begin (first statement)) (M_block statement state return cont break throw))
+
       (else state)
       )))
       
@@ -77,6 +89,16 @@
 (define M_return
   (lambda (statement state return cont break throw)
     (return (M_value (second statement) state))))
+
+; need to fix
+; evaluate the while statement returns state
+;(define M_while
+  ;(lambda (condition expression state)
+    ;(cond
+      ;((M_value condition state) (M_while condition expression (M_state expression state)))
+      ;(else state) )))
+
+
 
 ; calculate the arithmetic expressions and return the number after calculation
 (define M_value
@@ -146,29 +168,26 @@
   (lambda (statement state return cont break throw)
     (if (inState? (second statement) state)
         (add_to_state (second statement) (M_value (third statement) state) state)
-        (error "Error Code: USING_BEFORE_DECLARING") )))
+        (error "Error Code: USING_BEFORE_DECLARING")
+        )))
 
-; evaluate the while statement returns state
-(define M_while
-  (lambda (condition body state return cont break throw)
-    (call/cc
-      (lambda (break2)
-        (letrec ((while_loop (lambda (condition body state return cont break throw)
-          (if (M_value condition state)
-            (while_loop condition body
-              (call/cc 
-                (lambda (cont2) 
-                  (M_state body state return cont2 break throw)))
-               return cont break throw)
-            state))))
-          (while_loop condition body state return cont break2 throw) )))))
-
-; process a block of code
 (define M_block
   (lambda (statement state return cont break throw)
     (pop_layer (M_statement_list (rest statement) (push_layer state) return (lambda (w) (cont (pop_layer w))) (lambda (w) (break (pop_layer w))) (lambda (w s) (throw w (pop_layer s)))))))
 
-; ---------------------------------------HELPERS--------------------------------
+
+; -----------------------------------------Abstraction-------------------------------------------------------
+;(define first car)
+(define condition car)
+;(define second cadr)
+;(define third caddr)
+(define else_branch cadddr)
+(define operator car)
+;(define rest cdr)
+(define rest_after_two cddr)
+
+; ---------------------------------------The followings are the helper methods--------------------------------
+
 ; Check if the name is declared
 (define isDeclared
   (lambda (statement state)
@@ -194,13 +213,3 @@
 (define hasElse?
   (lambda (statement)
     (not (null? (cdddr statement))) ))
-
-; -----------------------------------------ABSTRACTION HELPERS-------------------------------------------------------
-(define condition car)
-(define else_branch cadddr)
-(define operator car)
-(define rest_after_two cddr)
-
-(define break cadr)
-(define cont caddr)
-(define throw cadddr)
