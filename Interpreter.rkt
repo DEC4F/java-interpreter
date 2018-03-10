@@ -1,5 +1,6 @@
 ; Group 3
 ; Member: Shihong Ling, Stanley Tian, Yuhang Li
+; Test Results: Test 1 ~ 19 work properly, I have tried Test 20 but failed T T.
 
 ; include parse tree
 (load "simpleParser.scm")
@@ -11,7 +12,7 @@
     (evaluate
      (call/cc
       (lambda (return)
-        (M_state (parser file) (base) return (lambda (v1) (error "Error Code: INVALID_CONTINUE")) (lambda (v2) (error "Error Code: INVALID_BREAK")) (lambda (v3) (error "Error Code: UNKNOWN_ERROR" v3)))
+        (M_state (parser file) (base) return (lambda (v1) (error "Error Code: INVALID_CONTINUE")) (lambda (v2) (error "Error Code: INVALID_BREAK")) (lambda (e v3) (error "Error Code: UNKNOWN_ERROR" v3)))
         )))))
 
 ; evaluate the statemet in the parse tree if every statement is evaluated, return the state which will store the output
@@ -45,7 +46,7 @@
       ;Case 5: check assign statement
       ((eq? (stmt_type statement) '=) (M_assign statement state return cont break throw))
       ;Case 6: check throw
-      ((eq? (stmt_type statement) 'throw) (throw (second statement) state))
+      ((eq? (stmt_type statement) 'throw) (throw (thrown_part statement) state))
       ;Case 7: check break
       ((eq? (stmt_type statement) 'break) (break state))
       ;Case 8: check continue
@@ -96,7 +97,7 @@
       ((eq? (operator expression) '+) (+ (M_value (operand_1 expression) state) (M_value (operand_2 expression) state)))
       ;Case 5: the value is the result of -
       ((eq? (operator expression) '-) (cond
-                                   ((eq? (rest_after_two expression) '()) (- 0 (M_value (operand_1 expression) state)))
+                                   ((eq? (second_operand_part expression) '()) (- 0 (M_value (operand_1 expression) state)))
                                    (else (- (M_value (operand_1 expression) state) (M_value (operand_2 expression) state))) ))
       ;Case 6: the value is the result of *
       ((eq? (operator expression) '*) (* (M_value (operand_1 expression) state) (M_value (operand_2 expression) state)))
@@ -124,7 +125,7 @@
       ((eq? (operator expression) '!) (not (M_value (operand_1 expression) state)))
       ;Case error: check declare or initialization error
       ((or (eq? 'uninitialized (M_value (operand_1 expression) state)) (eq? 'undeclared (M_value (operand_1 expression) state))) (error "Error Code: UNDEFINED_OR_UNINITIALIZED_VARIABLE"))
-      ((and (not (null? (rest_after_two expression))) (or (eq? 'uninitialized (M_value (operand_2 expression) state)) (eq? 'undeclared (M_value (operand_2 expression) state)))) (error "Error Code: UNDEFINED_OR_UNINITIALIZED_VARIABLE"))
+      ((and (not (null? (second_operand_part expression))) (or (eq? 'uninitialized (M_value (operand_2 expression) state)) (eq? 'undeclared (M_value (operand_2 expression) state)))) (error "Error Code: UNDEFINED_OR_UNINITIALIZED_VARIABLE"))
       )))
 
 ; Declare variable
@@ -134,7 +135,7 @@
       ; edge case: var already declared
       ((inState? (variable statement) state) (error "Error Code: REDEFINING_VARIABLE"))
       ; case 1: declare a var but not assign any value
-      ((null? (rest_after_two statement)) (add_to_state (variable statement) 'uninitialized state))
+      ((null? (declare_right_side statement)) (add_to_state (variable statement) 'uninitialized state))
       ; case 2: declare a var and assign a value to it
       (else (add_to_state (variable statement) (M_value (value statement) state) (M_state (value statement) state return cont break throw))) 
        )))
@@ -235,6 +236,7 @@
       ((eq? (car list)) (+ 1 (find_num x (cdr list))))
       (else (find_num x (cdr list))))))
 ; -----------------------------------------ABSTRACTION HELPERS-------------------------------------------------------
+(define thrown_part cadr)
 (define operand_1 cadr)
 (define operand_2 caddr)
 (define condition cadr)
@@ -243,7 +245,8 @@
 (define loop_body caddr)
 (define operator car)
 (define stmt_type car)
-(define rest_after_two cddr)
+(define second_operand_part cddr)
+(define declare_right_side cddr)
 (define variable cadr)
 (define value caddr)
 (define trybody cadr)
