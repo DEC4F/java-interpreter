@@ -1,5 +1,6 @@
 ; Group 3
 ; Member: Shihong Ling, Stanley Tian, Yuhang Li
+; Test Results: Test 1 ~ 18 work properly
 
 ; include parse tree
 (load "simpleParser.scm")
