@@ -5,7 +5,7 @@
 
 
 ; An interpreter for the simple language that uses call/cc for the continuations.  Does not handle side effects.
-;(define call/cc call-with-current-continuation)
+(define call/cc call-with-current-continuation)
 
 
 ; The functions that start interpret-...  all return the current environment.
@@ -15,7 +15,7 @@
 (define interpret
   (lambda (file)
     (scheme->language
-     (let
+     (let*
          ((env (interpret-statement-list (parser file) (newenvironment) default-return default-break default-continue default-throw)))
      (call/cc
       (lambda (return)
@@ -50,6 +50,8 @@
 (define interpret-statement
   (lambda (statement environment return break continue throw)
     (cond
+      ((eq? 'function (statement-type statement)) (interpret-function statement environment return break continue throw))
+      ((eq? 'funcall (statement-type statement)) (interpret-funcall statement environment return break continue throw))
       ((eq? 'return (statement-type statement)) (interpret-return statement environment return break continue throw))
       ((eq? 'var (statement-type statement)) (interpret-declare statement environment return break continue throw))
       ((eq? '= (statement-type statement)) (interpret-assign statement environment return break continue throw))
@@ -60,8 +62,6 @@
       ((eq? 'begin (statement-type statement)) (interpret-block statement environment return break continue throw))
       ((eq? 'throw (statement-type statement)) (interpret-throw statement environment throw))
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw))
-      ((eq? 'function (statement-type statement)) (interpret-function statement environment return break continue throw))
-      ((eq? 'funcall (statement-type statement))(interpret-funcall statement environment return break continue throw))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
 ; Calls the return continuation with the given expression value
@@ -80,7 +80,7 @@
 ; Calls functions
 (define interpret-funcall
   (lambda (statement environment return break continue throw)
-    (interpret-value statement environment return break continue throw) environment))
+    (interpret-value statement environment return break continue throw)))
 
 ; Adds a new variable binding to the environment.  There may be an assignment with the variable
 (define interpret-declare
@@ -206,8 +206,7 @@
 (define eval-funcall
   (lambda (statement environment return break continue throw)
     (let* ((closure (lookup (function-name statement) environment))
-           (outerenv ((function-env closure) environment)) ;function's environment
-           (new-environment (cons (new-frame-parameter (formal-parameter closure) (actual-parameter statement) environment return break continue throw) outerenv)))
+           (new-environment (cons (new-frame-parameter (formal-parameter closure) (actual-parameter statement) environment return break continue throw) environment)))
       (call/cc
        (lambda (return)
          (interpret-statement-list (function-body closure) new-environment return default-break default-continue throw)))) ))
