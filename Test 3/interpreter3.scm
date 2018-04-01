@@ -44,14 +44,23 @@
   (lambda (statement-list environment return break continue throw)
     (if (null? statement-list)
         environment
-        (interpret-statement-list (cdr statement-list) (interpret-statement (car statement-list) environment return break continue throw) return break continue throw))))
+        (interpret-statement-list (cdr statement-list)
+                                      (interpret-statement (car statement-list) environment return break continue throw)
+                                  return break continue throw))))
+
+(define removereturn
+  (lambda (statement)
+    (cond
+      ((null? statement) '())
+      ((eq? (caar statement) 'return) (cdr statement))
+      (else (cons (car statement) (removereturn (cdr statement)))))))
 
 ; interpret a statement in the environment with continuations for return, break, continue, throw
 (define interpret-statement
   (lambda (statement environment return break continue throw)
     (cond
       ((eq? 'function (statement-type statement)) (interpret-function statement environment return break continue throw))
-      ((eq? 'funcall (statement-type statement)) (interpret-funcall statement environment return break continue throw))
+      ((eq? 'funcall (statement-type statement)) (interpret-funstate statement environment return break continue throw))
       ((eq? 'return (statement-type statement)) (interpret-return statement environment return break continue throw))
       ((eq? 'var (statement-type statement)) (interpret-declare statement environment return break continue throw))
       ((eq? '= (statement-type statement)) (interpret-assign statement environment return break continue throw))
@@ -76,11 +85,17 @@
                   (list (get-parameter statement) (get-funcbody statement)
                         (lambda (environment)
                           (get-function-frame (function-name statement) environment))) environment)))
-
 ; Calls functions
 (define interpret-funcall
   (lambda (statement environment return break continue throw)
     (interpret-value statement environment return break continue throw)))
+
+(define interpret-funstate
+  (lambda (statement environment return break continue throw)
+    (let* ((closure (lookup (function-name statement) environment))
+           (new-environment (cons (new-frame-parameter (formal-parameter closure) (actual-parameter statement) environment return break continue throw) environment)))
+         (interpret-statement-list (removereturn (function-body closure)) new-environment return default-break default-continue throw))))
+    
 
 ; Adds a new variable binding to the environment.  There may be an assignment with the variable
 (define interpret-declare
