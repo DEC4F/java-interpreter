@@ -1,303 +1,470 @@
-# Testing Your Interpreter, Part 2
+Current Version : Interpreter v3 (Last Modified : April 2nd)
 
-### Test 1: This code should return 20.
+Interpreter now could deal with function definitions and function calls, behaving the same way as Java does. 
 
-var x = 10;
-{
-  var y = 2;
-  var z = x * y;
-  x = z;
-}
-return x;
+It couldn't handle with function calls in loops and we are working on it.
 
-### Test 2: This code should return 164.
+Test Codes:
+(Passing all except 14 and 15, the loop part)
+Test 1: A main with code inside. This code should return 10.
 
-var a = 31160;
-var b = 1476;
-if (a < b) {
-  var temp = a;
-  a = b;
-  b = temp;
-}
-var r = a % b;
-while (r != 0) {
-  a = b;
-  b = r;
-  r = a % b;
-}
-return b;
+function main() {
+  var x = 10;
+  var y = 20;
+  var z = 30;
+  var min = 0;
 
-### Test 3: This code should return 32.
-
-var x = 0;
-var y = 10;
-while (!(x >= y) || !(y > 25)) {
-  x = x + 2;
-  y = y + 1;
-}
-return x;
-
-### Test 4: This code should return 2.
-
-var x = 1;
-var y = x + 1;
-if (x < y) {
-  var z = 10;
-
-  if (x < z) {
-    var swap = y;
-    y = x;
-    x = swap;
-  }
-}
-return x;
-
-### Test 5: This code should give an error.
-
-var x = 10;
-var y = 4;
-if (x < y) {
-  var min = x;
-}
-else {
-  var min = y;
-}
-return min;
-
-### Test 6: This code should return 25.
-
-var x = 0;
-x = x + 25;
-return x;
-x = x + 25;
-return x;
-x = x + 25;
-return x;
-
-### Test 7: This code should return 21.
-
-var x = 0;
-var result = 0;
-
-while (x < 10) {
-  if (result > 15) {
-    return result;
-  }
-  result = result + x;
-  x = x + 1;
-}
-return result;
-
-### Test 8: This code should return 6.
-
-var x = 0;
-while (x < 6) {
-  x = x + 1;
-  continue;
-  x = x + 100;
-}
-return x;
-
-### Test 9: This code should return -1.
-
-var x = 0;
-while (x < 10) {
-  x = x - 1;
-  break;
-  x = x + 100;
-}
-return x;
-
-### Test 10: This code should return 789.
-
-var x = 0;
-var y = x;
-var z = y;
-while (1 == 1) {
-  y = y - x;
-  while (2 == 2) {
-    z = z - y;
-    while (3 == 3) {
-      z = z + 1;
-      if (z > 8)
-        break;
-      else
-        continue;
-    }
-    y = y + 1;
-    if (y <= 7)
-      continue;
-    else
-      break;
-  }
-  x = x + 1;
-  if (x > 6)
-    break;
+  if (x < y)
+    min = x;
   else
-    continue;
+    min = y;
+  if (min > z)
+    min = z;
+  return min;
 }
-return x * 100 + y * 10 + z;
+Test 2: A function that uses global variables. This code should return 14.
 
-### Test 11: This code should give an error.
+var x = 4;
+var y = 6 + x;
+
+function main() {
+  return x + y;
+}
+Test 3: A function that changes global variables. This code should return 45.
+
+var x = 1;
+var y = 10;
+var r = 0;
+
+function main() {
+  while (x < y) {
+     r = r + x;
+     x = x + 1;
+  }
+  return r;
+}
+
+Test 4: A recursive function. This code should return 55.
+
+function fib(a) {
+  if (a == 0)
+    return 0;
+  else if (a == 1)
+    return 1;
+  else 
+    return fib(a-1) + fib(a-2);
+}
+
+function main() {
+  return fib(10);
+}
+
+Test 5: Functions with multiple parameters that hide global variables. This code should return 1.
+
+function min(x, y, z) {
+  if (x < y) {
+    if (x < z)
+      return x;
+    else if (z < x)
+      return z;
+  }
+  else if (y > z)
+    return z;
+  else
+    return y;
+}
+
+var x = 10;
+var y = 20;
+var z = 30;
+
+var min1 = min(x,y,z);
+var min2 = min(z,y,x);
+
+function main() {
+  var min3 = min(y,z,x);
+
+  if (min1 == min3)
+    if (min1 == min2)
+      if (min2 == min3)
+        return 1;
+  return 0;
+}
+Test 6: Verifying that your code uses static scoping instead of dynamic scoping. This code should return 115.
+
+var a = 10;
+var b = 20;
+
+function bmethod() {
+  var b = 30;
+  return a + b;
+}
+
+function cmethod() {
+  var a = 40;
+  return bmethod() + a + b;
+}
+
+function main () {
+  var b = 5;
+  return cmethod() + a + b;
+}
+Test 7: Boolean parameters and return values. This code should return true.
+
+function minmax(a, b, min) {
+  if (min && a < b || !min && a > b)
+    return true;
+  else
+    return false;
+}
+
+function main() {
+  return (minmax(10, 100, true) && minmax(5, 3, false));
+}
+Test 8: Multiple function calls in an expression. This code should return 20.
+
+function fact(n) {
+  var f = 1;
+  while (n > 1) {
+    f = f * n;
+    n = n - 1;
+  }
+  return f;
+}
+
+function binom(a, b) {
+  var val = fact(a) / (fact(b) * fact(a-b));
+  return val;
+}
+
+function main() {
+  return binom(6,3);
+}
+Test 9: A function call in the parameter of a function. This code should return 24.
+
+function fact(n) {
+  var r = 1;
+  while (n > 1) {
+    r = r * n;
+    n = n - 1;
+  }
+  return r;
+}
+
+function main() {
+  return fact(fact(3) - fact(2));
+}
+Test 10: A function call that ignores the return value. This code should return 2.
+
+var count = 0;
+
+function f(a,b) {
+  count = count + 1;
+  a = a + b;
+  return a;
+}
+
+function main() {
+  f(1, 2);
+  f(3, 4);
+  return count;
+}
+Test 11: A function without a return statement. This code should return 35.
 
 var x = 0;
-while (x < 10) {
-  var y = 0;
-  x = x + 1;
-  y = y - 1;
-  break;
-}
-if (x > 0) {
-  x = y;
-}
-return x;
+var y = 0;
 
-### Test 12: This code should give an error.
+function setx(a) {
+  x = a;
+}
 
-var x = 1;
-var y = 2;
-if (x < y) {
-  var z = 0;
-  while (z < 100) {
-    var a = 1;
-    z = z + a;
-    continue;
-    z = 1000;
+function sety(b) {
+  y = b;
+}
+
+function main() {
+  setx(5);
+  sety(7);
+  return x * y;
+}
+Test 12: Mismatched parameters and arguments. This code should give an error.
+
+function f(a) {
+  return a*a;
+}
+
+function main() {
+  return f(10, 11, 12);
+}
+Test 13: Functions inside functions. This code should return 90.
+
+function main() {
+  function h() {
+    return 10;
   }
-  if (z != x) {
-    z = a;
+
+  function g() {
+    return 100;
   }
+
+  return g() - h();
 }
-return x;
+Test 14: Functions inside functions accessing variables outside. This code should return 69.
 
-### Test 13: This code should give an error.
+function collatz(n) {
+  var counteven = 0;
+  var countodd = 0;
 
-var x = 1;
-break;
-return x;
+  function evenstep(n) {
+    counteven = counteven + 1;
+    return n / 2;
+  }
 
-### Test 14: This code should return 12.
+  function oddstep(n) {
+    countodd = countodd + 1;
+    return 3 * n + 1;
+  }
 
-var x = 1;
-while (true) {
-  x = x + 1;
-  if (x > 10 && x % 2 == 0)
-   break;
+  while (n != 1) {
+    if (n % 2 == 0)
+      n = evenstep(n);
+    else
+      n = oddstep(n);
+  }
+  return counteven + countodd;
 }
-return x;
 
-### Test 15 should return 125.
 
-var x;
-
-try {
-  x = 20;
-  if (x < 0)
-    throw 10;
-  x = x + 5;
+function main() {
+  return collatz(111);
 }
-catch(e) {
-  x = e;
+Test 15: Functions inside functions with variables of the same name. Thus code should return 87.
+
+function f(n) {
+  var a;
+  var b;
+  var c;
+
+  a = 2 * n;
+  b = n - 10;
+
+  function g(x) {
+    var a;
+    a = x + 1;
+    b = 100;
+    return a;
+  }
+
+  if (b == 0)
+    c = g(a);
+  else
+    c = a / b;
+  return a + b + c;
 }
-finally {
-  x = x + 100;
+
+function main() {
+  var x = f(10);
+  var y = f(20);
+
+  return x - y;
 }
-return x;
+Test 16: Functions inside functions inside functions. This code should return 64.
 
-### Test 16 should return 110.
+function main() {
+  var result;
+  var base;
 
-var x;
+  function getpow(a) {
+     var x;
 
-try {
-  x = 20;
-  if (x > 10)
-    throw 10;
-  x = x + 5;
+     function setanswer(n) {
+        result = n;
+     }
+
+     function recurse(m) {
+       if (m > 0) {
+         x = x * base;
+         recurse(m-1);
+       }
+       else
+         setanswer(x);
+     }
+
+     x = 1;
+     recurse(a);
+  }
+  base = 2;
+  getpow(6);
+  return result;
 }
-catch(e) {
-  x = e;
+Test 17: Functions inside functions accessing out of scope variables. This code should return an error with b out of scope.
+
+function f(x) {
+  function g(x) {
+    var b;
+    b = x;
+    return 0;
+  }
+
+  function h(x) {
+    b = x;
+    return 1;
+  }
+
+  return g(x) + h(x);
 }
-finally {
-  x = x + 100;
+
+function main() {
+  return f(10);
 }
-return x;
+Test 18: try/catch finally, but no exception thrown. This code should return 125.
 
-### Test 17 should return 2000400.
+function divide(x, y) {
+  if (y == 0)
+    throw y;
+  return x / y;
+}
 
-var x = 0;
-var j = 1;
+function main() {
+  var x;
 
-try {
-  while (j >= 0) {
+  try {
+    x = divide(10, 5) * 10;
+    x = x + divide(5, 1);
+  }
+  catch(e) {
+    x = e;
+  }
+  finally {
+    x = x + 100;
+  }
+  return x;
+}
+Test 19: Throwing an exception inside a function. This code should return 100.
+
+function divide(x, y) {
+  if (y == 0)
+    throw y;
+  return x / y;
+}
+
+function main() {
+  var x;
+
+  try {
+    x = divide(10, 5) * 10;
+    x = x + divide(5, 0);
+  }
+  catch(e) {
+    x = e;
+  }
+  finally {
+    x = x + 100;
+  }
+  return x;
+}
+Test 20: Throwing an exception from a function. This code should return 2000400.
+
+function divide(x, y) {
+  if (y == 0)
+    throw 1000000;
+  return x / y;
+}
+
+ function main() {
+  var x = 0;
+  var j = 1;
+
+  try {
+    while (j >= 0) {
     var i = 10;
     while (i >= 0) {
       try {
-        if (i == 0)
-          throw 1000000;
-        x = x + 10*i / i;
+        x = x + divide(10*i, i);
       }
       catch(e) {
-        if (j == 0)
-          throw 1000000;
-        x = x + e / j;
+        x = x + divide(e, j);
       }
       i = i - 1;
     }
     j = j - 1;
+   }
   }
-}
-catch (e2) {
-  x = x * 2;
-}
-return x;
-
-### Test 18 should return 101.
-
-var x = 10;
-var result = 1;
-
-try {
-  while (x < 10000) {
-     result = result - 1;
-     x = x + 10;
-
-     if (x > 1000) {
-       throw x;
-     }
-     else if (x > 100) {
-        break;
-     }
+  catch (e2) {
+    x = x * 2;
   }
+  return x;
 }
-finally {
-  result = result + x;
+Additional Tests For Those Doing the Extra Challenge
+
+Test 21: Call-by-reference test. This code should return 3421.
+
+function swap1(x, y) {
+  var temp = x;
+  x = y;
+  y = temp;
 }
-return result;
 
-### Test 19 should give an error.
+function swap2(&x, &y) {
+  var temp = x;
+  x = y;
+  y = temp;
+}
 
-var x = 10;
-var result = 1;
+function main() {
+  var a = 1;
+  var b = 2;
+  swap1(a,b);
+  var c = 3;
+  var d = 4;
+  swap2(c,d);
+  return a + 10*b + 100*c + 1000*d;
+}
+Test 22: Assignment side effects with function calls. This code should return 20332.
 
-try {
-  while (x < 10000) {
-    result = result - 1;
-    x = x * 10;
+var x;
 
-    if (x > 1000)
-      throw x;
+function f(a,b) {
+  return a * 100 + b;
+}
+
+function fib(f) {
+  var last = 0;
+  var last1 = 1;
+
+  while (f > 0) {
+    f = f - 1;
+    var temp = last1 + last;
+    last = last1;
+    last1 = temp;
   }
+  return last;
 }
-catch (ex) {
-  throw 1;
+
+function main() {
+  var y;
+  var z = f(x = fib(3), y = fib(4));
+  return z * 100 + y * 10 + x;
 }
-return result;
+Test 23: Mixture of call-by-value and call-by-reference. This code should return 21.
 
-Additional Test for Those Seeking an Extra Challenge
-
-### Test 20: This code should return 21.
-
-var x = 0;
-while ((x = x + 1) < 21)
-  x = x;
-return x;
+function gcd(a, &b) {
+  if (a < b) {
+    var temp = a;
+    a = b;
+    b = temp;
+  }
+  var r = a % b;
+  while (r != 0) {
+    a = b;
+    b = r;
+    r = a % b;
+  }
+  return b;
+}
+function main () {
+  var x = 14;
+  var y = 3 * x - 7;
+  gcd(x,y);
+  return x+y;
+}
