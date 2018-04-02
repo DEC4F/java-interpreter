@@ -48,13 +48,6 @@
                                       (interpret-statement (car statement-list) environment return break continue throw)
                                   return break continue throw))))
 
-(define removereturn
-  (lambda (statement)
-    (cond
-      ((null? statement) '())
-      ((eq? (caar statement) 'return) (cdr statement))
-      (else (cons (car statement) (removereturn (cdr statement)))))))
-
 ; interpret a statement in the environment with continuations for return, break, continue, throw
 (define interpret-statement
   (lambda (statement environment return break continue throw)
@@ -89,7 +82,7 @@
 (define interpret-funcall
   (lambda (statement environment return break continue throw)
     (interpret-value statement environment return break continue throw)))
-
+; return the state after we call a function. Mainly used to deal with global variables.
 (define interpret-funstate
   (lambda (statement environment return break continue throw)
     (let* ((closure (lookup (function-name statement) environment))
@@ -332,6 +325,13 @@
 ; Environment/State Functions
 ;------------------------
 
+; remove return in a code when return is not needed.
+(define removereturn
+  (lambda (statement)
+    (cond
+      ((null? statement) '())
+      ((eq? (caar statement) 'return) (cdr statement))
+      (else (cons (car statement) (removereturn (cdr statement)))))))
 ; create a new empty environment
 (define newenvironment
   (lambda ()
