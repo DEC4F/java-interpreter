@@ -3,13 +3,8 @@
 ;Reference: our interpret3 is based on the interpret2-callcc-no-boxes.scm provided by Prof.Connamacher
 (load "functionParser.scm")
 
-
 ; An interpreter for the simple language that uses call/cc for the continuations.  Does not handle side effects.
 ;(define call/cc call-with-current-continuation)
-
-
-; The functions that start interpret-...  all return the current environment.
-; The functions that start eval-...  all return a value
 
 ; The main function.  Calls parser to get the parse tree and interprets it with a new environment.  The returned value is in the environment.
 (define interpret
@@ -26,7 +21,7 @@
 (define default-return
   (lambda (v)
     (myerror "Return used outside of the function call")))
-    
+
 (define default-break
   (lambda (env)
     (myerror "Break used outside of loop")))
@@ -45,8 +40,8 @@
   (lambda (statement-list environment return break continue throw)
     (if (null? statement-list)
         environment
-        (interpret-statement-list (cdr statement-list)
-                                      (interpret-statement (car statement-list) environment return break continue throw)
+        (interpret-statement-list (rest statement-list)
+                                      (interpret-statement (first statement-list) environment return break continue throw)
                                   return break continue throw))))
 
 ; interpret a statement in the environment with continuations for return, break, continue, throw
@@ -55,19 +50,19 @@
     (cond
       ((null? statement) environment)
       ((not (list? statement)) environment)
-      ((statement-list? statement) (interpret-statement-list statement environment return break continue throw))
-      ((eq? 'function (statement-type statement)) (interpret-function statement environment return break continue throw))
-      ((eq? 'funcall (statement-type statement)) (interpret-funcall statement environment return break continue throw))
-      ((eq? 'return (statement-type statement)) (interpret-return statement environment return break continue throw))
-      ((eq? 'var (statement-type statement)) (interpret-declare statement environment return break continue throw))
-      ((eq? '= (statement-type statement)) (interpret-assign statement environment return break continue throw))
-      ((eq? 'if (statement-type statement)) (interpret-if statement environment return break continue throw))
-      ((eq? 'while (statement-type statement)) (interpret-while statement environment return break continue throw))
-      ((eq? 'continue (statement-type statement)) (continue environment))
-      ((eq? 'break (statement-type statement)) (break environment))
-      ((eq? 'begin (statement-type statement)) (interpret-block statement environment return break continue throw))
-      ((eq? 'throw (statement-type statement)) (interpret-throw statement environment throw))
-      ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw))
+      ((is-statement-list? statement) (interpret-statement-list statement environment return break continue throw))
+      ((is-function? statement) (interpret-function statement environment return break continue throw))
+      ((is-funcall? statement) (interpret-funcall statement environment return break continue throw))
+      ((is-return? statement) (interpret-return statement environment return break continue throw))
+      ((is-declare? statement) (interpret-declare statement environment return break continue throw))
+      ((is-assign? statement) (interpret-assign statement environment return break continue throw))
+      ((is-if? statement) (interpret-if statement environment return break continue throw))
+      ((is-while? statement) (interpret-while statement environment return break continue throw))
+      ((is-cont? statement) (continue environment))
+      ((is-break? statement) (break environment))
+      ((is-begin? statement) (interpret-block statement environment return break continue throw))
+      ((is-throw? statement) (interpret-throw statement environment return break continue throw))
+      ((is-try? statement) (interpret-try statement environment return break continue throw))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
 ; Calls the return continuation with the given expression value
@@ -87,20 +82,12 @@
   (lambda (statement environment return break continue throw)
     (interpret-value statement environment return break continue throw) environment))
 
-; Return the state after we call a function. Mainly used to deal with global variables.
-(define interpret-funstate
-  (lambda (statement environment return break continue throw)
-    (let* ((closure (lookup (function-name statement) environment))
-           (new-environment (cons (new-frame-parameter (formal-parameter closure) (actual-parameter statement) environment return break continue throw) environment)))
-         (interpret-statement-list (removereturn (function-body closure)) new-environment return default-break default-continue throw))))
-    
-
 ; Adds a new variable binding to the environment.  There may be an assignment with the variable
 (define interpret-declare
   (lambda (statement environment return break continue throw)
     (if (exists-declare-value? statement)
         (insert (get-declare-var statement) (interpret-value (get-declare-value statement) environment return break continue throw)
-                (interpret-statement (get-declare-value statement) environment return break continue throw))
+                environment)
         (insert (get-declare-var statement) 'novalue environment))))
 
 ; Updates the environment to add an new binding for a variable
@@ -131,7 +118,7 @@
 ; Interprets a block.  The break, continue, and throw continuations must be adjusted to pop the environment
 (define interpret-block
   (lambda (statement environment return break continue throw)
-    (pop-frame (interpret-statement-list (cdr statement)
+    (pop-frame (interpret-statement-list (rest statement)
                                          (push-frame environment)
                                          return
                                          (lambda (env) (break (pop-frame env)))
@@ -140,10 +127,24 @@
 
 ; We use a continuation to throw the proper value. Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
-  (lambda (statement environment throw)
-    (throw (eval-expression (get-expr statement) environment) environment)))
+  (lambda (statement environment return break continue throw)
+    (throw (interpret-value (get-expr statement) environment return break continue throw) environment)))
 
-; Interpret a try-catch-finally block
+; To interpret a try block, we must adjust  the return, break, continue continuations to interpret the finally block if any of them are used.
+;  We must create a new throw continuation and then interpret the try block with the new continuations followed by the finally block with the old continuations
+(define interpret-try
+  (lambda (statement environment return break continue throw)
+    (call/cc
+     (lambda (jump)
+       (let* ((finally-block (make-finally-block (get-finally statement)))
+              (try-block (make-try-block (get-try statement)))
+              (new-return (lambda (v) (begin (interpret-block finally-block environment return break continue throw) (return v))))
+              (new-break (lambda (env) (break (interpret-block finally-block env return break continue throw))))
+              (new-continue (lambda (env) (continue (interpret-block finally-block env return break continue throw))))
+              (new-throw (create-throw-catch-continuation (get-catch statement) environment return break continue throw jump finally-block)))
+         (interpret-block finally-block
+                          (interpret-block try-block environment new-return new-break new-continue new-throw)
+                          return break continue throw))))))
 
 ; Create a continuation for the throw.  If there is no catch, it has to interpret the finally block, and once that completes throw the exception.
 ;   Otherwise, it interprets the catch block with the exception bound to the thrown value and interprets the finally block when the catch is done
@@ -163,21 +164,6 @@
                                                  (lambda (v env2) (throw v (pop-frame env2)))))
                                      return break continue throw)))))))
 
-; To interpret a try block, we must adjust  the return, break, continue continuations to interpret the finally block if any of them are used.
-;  We must create a new throw continuation and then interpret the try block with the new continuations followed by the finally block with the old continuations
-(define interpret-try
-  (lambda (statement environment return break continue throw)
-    (call/cc
-     (lambda (jump)
-       (let* ((finally-block (make-finally-block (get-finally statement)))
-              (try-block (make-try-block (get-try statement)))
-              (new-return (lambda (v) (begin (interpret-block finally-block environment return break continue throw) (return v))))
-              (new-break (lambda (env) (break (interpret-block finally-block env return break continue throw))))
-              (new-continue (lambda (env) (continue (interpret-block finally-block env return break continue throw))))
-              (new-throw (create-throw-catch-continuation (get-catch statement) environment return break continue throw jump finally-block)))
-         (interpret-block finally-block
-                          (interpret-block try-block environment new-return new-break new-continue new-throw)
-                          return break continue throw))))))
 
 ; helper methods so that I can reuse the interpret-block method on the try and finally blocks
 (define make-try-block
@@ -189,7 +175,7 @@
     (cond
       ((null? finally-statement) '(begin))
       ((not (eq? (statement-type finally-statement) 'finally)) (myerror "Incorrectly formatted finally block"))
-      (else (cons 'begin (cadr finally-statement))))))
+      (else (cons 'begin (second finally-statement))))))
 
 ; Evaluates all possible boolean and arithmetic expressions, including constants and variables. 
 (define interpret-value
@@ -228,17 +214,6 @@
        (lambda (return)
          (interpret-statement-list (function-body closure) new-environment return default-break default-continue throw)))) ))
 
-; Evaluates all possible boolean and arithmetic expressions, including constants and variables.
-(define eval-expression
- (lambda (expr environment)
-    (cond
-      ((number? expr) expr)
-      ((eq? expr 'true) #t)
-      ((eq? expr 'false) #f)
-      ((not (list? expr)) (lookup expr environment))
-      (else (eval-operator expr environment)))))
-
-
 ;-----------------
 ; HELPER FUNCTIONS
 ;-----------------
@@ -257,7 +232,7 @@
   (lambda (statement)
     (not (null? (cdddr statement)))))
 
-(define statement-list?
+(define is-statement-list?
   (lambda (stmt)
     (list? (car stmt)) ))
 
@@ -297,14 +272,6 @@
 ;------------------------
 ; Environment/State Functions
 ;------------------------
-
-; Remove return in a code when return is not needed.
-(define removereturn
-  (lambda (statement)
-    (cond
-      ((null? statement) '())
-      ((eq? (caar statement) 'return) (cdr statement))
-      (else (cons (car statement) (removereturn (cdr statement)))))))
 
 ; Create a new empty environment
 (define newenvironment
@@ -481,7 +448,65 @@
       ((eq? v #t) 'true)
       (else v))))
 
+; Determine if a statement is try statement
+(define is-try?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'try) #t #f)))
 
+; Determine if a statement is throw statement
+(define is-throw?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'throw) #t #f)))
+
+; Determine if a statement is begin statement
+(define is-begin?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'begin) #t #f)))
+
+; Determine if a statement is break statement
+(define is-break?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'break) #t #f)))
+
+; Determine if a statement is continue statement
+(define is-cont?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'continue) #t #f)))
+
+; Determine if a statement is while statement
+(define is-while?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'while) #t #f)))
+
+; Determine if a statement is if statement
+(define is-if?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'if) #t #f)))
+
+; Determine if a statement is a function
+(define is-function?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'function) #t #f)))
+
+; Determine if a statement is function call
+(define is-funcall?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'funcall) #t #f)))
+
+; Determine if a statement is return statement
+(define is-return?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'return) #t #f)))
+
+; Determine if a statement is declaring a variable
+(define is-declare?
+  (lambda (statement)
+    (if (eq? (statement-type statement) 'var) #t #f)))
+
+; Determine if a statement is assignment
+(define is-assign?
+  (lambda (statement)
+    (if (eq? (statement-type statement) '=) #t #f)))
 
 ; Because the error function is not defined in R5RS scheme, I create my own:
 (define error-break (lambda (v) v))
