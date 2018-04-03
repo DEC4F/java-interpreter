@@ -451,62 +451,62 @@
 ; Determine if a statement is try statement
 (define is-try?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'try) #t #f)))
+    (eq? (statement-type statement) 'try)))
 
 ; Determine if a statement is throw statement
 (define is-throw?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'throw) #t #f)))
+    (eq? (statement-type statement) 'throw)))
 
 ; Determine if a statement is begin statement
 (define is-begin?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'begin) #t #f)))
+    (eq? (statement-type statement) 'begin)))
 
 ; Determine if a statement is break statement
 (define is-break?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'break) #t #f)))
+    (eq? (statement-type statement) 'break)))
 
 ; Determine if a statement is continue statement
 (define is-cont?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'continue) #t #f)))
+    (eq? (statement-type statement) 'continue)))
 
 ; Determine if a statement is while statement
 (define is-while?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'while) #t #f)))
+    (eq? (statement-type statement) 'while)))
 
 ; Determine if a statement is if statement
 (define is-if?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'if) #t #f)))
+    (eq? (statement-type statement) 'if)))
 
 ; Determine if a statement is a function
 (define is-function?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'function) #t #f)))
+    (eq? (statement-type statement) 'function)))
 
 ; Determine if a statement is function call
 (define is-funcall?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'funcall) #t #f)))
+    (eq? (statement-type statement) 'funcall)))
 
 ; Determine if a statement is return statement
 (define is-return?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'return) #t #f)))
+    (eq? (statement-type statement) 'return)))
 
 ; Determine if a statement is declaring a variable
 (define is-declare?
   (lambda (statement)
-    (if (eq? (statement-type statement) 'var) #t #f)))
+    (eq? (statement-type statement) 'var)))
 
 ; Determine if a statement is assignment
 (define is-assign?
   (lambda (statement)
-    (if (eq? (statement-type statement) '=) #t #f)))
+    (eq? (statement-type statement) '=)))
 
 ; Because the error function is not defined in R5RS scheme, I create my own:
 (define error-break (lambda (v) v))
