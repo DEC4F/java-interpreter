@@ -66,7 +66,7 @@
       ((eq? 'continue (statement-type statement)) (continue environment))
       ((eq? 'break (statement-type statement)) (break environment))
       ((eq? 'begin (statement-type statement)) (interpret-block statement environment return break continue throw))
-      ((eq? 'throw (statement-type statement)) (interpret-throw statement environment return break continue throw))
+      ((eq? 'throw (statement-type statement)) (interpret-throw statement environment throw))
       ((eq? 'try (statement-type statement)) (interpret-try statement environment return break continue throw))
       (else (myerror "Unknown statement:" (statement-type statement))))))
 
@@ -100,7 +100,7 @@
   (lambda (statement environment return break continue throw)
     (if (exists-declare-value? statement)
         (insert (get-declare-var statement) (interpret-value (get-declare-value statement) environment return break continue throw)
-                environment)
+                (interpret-statement (get-declare-value statement) environment return break continue throw))
         (insert (get-declare-var statement) 'novalue environment))))
 
 ; Updates the environment to add an new binding for a variable
@@ -140,8 +140,8 @@
 
 ; We use a continuation to throw the proper value. Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
-  (lambda (statement environment return break continue throw)
-    (throw (interpret-value (get-expr statement) environment return break continue throw) environment)))
+  (lambda (statement environment throw)
+    (throw (eval-expression (get-expr statement) environment) environment)))
 
 ; Interpret a try-catch-finally block
 
