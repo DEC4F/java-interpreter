@@ -132,50 +132,27 @@
 
 ; To interpret a try block, we must adjust  the return, break, continue continuations to interpret the finally block if any of them are used.
 ;  We must create a new throw continuation and then interpret the try block with the new continuations followed by the finally block with the old continuations
+; Code for try part
 (define interpret-try
-  (lambda (statement environment return break continue throw)
-    (call/cc
-     (lambda (jump)
-       (let* ((finally-block (make-finally-block (get-finally statement)))
-              (try-block (make-try-block (get-try statement)))
-              (new-return (lambda (v) (begin (interpret-block finally-block environment return break continue throw) (return v))))
-              (new-break (lambda (env) (break (interpret-block finally-block env return break continue throw))))
-              (new-continue (lambda (env) (continue (interpret-block finally-block env return break continue throw))))
-              (new-throw (create-throw-catch-continuation (get-catch statement) environment return break continue throw jump finally-block)))
-         (interpret-block finally-block
-                          (interpret-block try-block environment new-return new-break new-continue new-throw)
-                          return break continue throw))))))
-
-; Create a continuation for the throw.  If there is no catch, it has to interpret the finally block, and once that completes throw the exception.
-;   Otherwise, it interprets the catch block with the exception bound to the thrown value and interprets the finally block when the catch is done
-(define create-throw-catch-continuation
-  (lambda (catch-statement environment return break continue throw jump finally-block)
+  (lambda (statement state return break cont throw)
     (cond
-      ((null? catch-statement) (lambda (ex env) (throw ex (interpret-block finally-block env return break continue throw)))) 
-      ((not (eq? 'catch (statement-type catch-statement))) (myerror "Incorrect catch statement"))
-      (else (lambda (ex env)
-              (jump (interpret-block finally-block
-                                     (pop-frame (interpret-statement-list 
-                                                 (get-body catch-statement) 
-                                                 (insert (catch-var catch-statement) ex (push-frame env))
-                                                 return 
-                                                 (lambda (env2) (break (pop-frame env2))) 
-                                                 (lambda (env2) (continue (pop-frame env2))) 
-                                                 (lambda (v env2) (throw v (pop-frame env2)))))
-                                     return break continue throw)))))))
+      ((not (hascatch? statement)) (interpret-statement (finallybody statement) (interpret-statement (trybody statement) state return break cont throw) return break cont throw))
+      ((not (hasfinally? statement))
+       (call/cc
+        (lambda (new_throw)
+          (interpret-statement (trybody statement) state return break cont (lambda (e new_state) (new_throw (interpret-catch (catchbody statement) e (errorName statement) new_state return break cont throw))))
+          )))
+      (else (interpret-statement (finallybody statement)
+                     (call/cc
+                      (lambda (new_throw)
+                        (interpret-statement (trybody statement) state return break cont
+                                 (lambda (e new_state) (new_throw (interpret-catch (catchbody statement) e (errorName statement) new_state return break cont throw))))))
+                     return break cont throw)))))
 
-
-; helper methods so that I can reuse the interpret-block method on the try and finally blocks
-(define make-try-block
-  (lambda (try-statement)
-    (cons 'begin try-statement)))
-
-(define make-finally-block
-  (lambda (finally-statement)
-    (cond
-      ((null? finally-statement) '(begin))
-      ((not (eq? (statement-type finally-statement) 'finally)) (myerror "Incorrectly formatted finally block"))
-      (else (cons 'begin (second finally-statement))))))
+; Code for catch part
+(define interpret-catch
+  (lambda (statement error errorName state return break cont throw)
+      (interpret-statement statement (insert errorName error state) return break cont throw)))
 
 ; Evaluates all possible boolean and arithmetic expressions, including constants and variables. 
 (define interpret-value
@@ -209,7 +186,8 @@
 (define eval-funcall
   (lambda (statement environment return break continue throw)
     (let* ((closure (lookup-val (function-name statement) environment))
-           (new-environment (cons (new-frame-parameter (formal-parameter closure) (actual-parameter statement) environment return break continue throw) environment)))
+           (outer ((function-env closure) environment))
+           (new-environment (cons (new-frame-parameter (formal-parameter closure) (actual-parameter statement) environment return break continue throw) outer)))
       (call/cc
        (lambda (return)
          (interpret-statement-list (function-body closure) new-environment return default-break default-continue throw)))) ))
@@ -253,9 +231,25 @@
 (define get-catch operand2)
 (define get-finally operand3)
 
-(define catch-var
-  (lambda (catch-statement)
-    (car (operand1 catch-statement))))
+; Check whether the try is followed by catch
+(define hascatch?
+  (lambda (statement)
+    (not (null? (caddr statement)))))
+
+;Check whether the try has finally
+(define hasfinally?
+  (lambda (statement)
+    (not (null? (cadddr statement)))))
+(define trybody cadr)
+(define catchbody
+  (lambda (statement)
+    (cdr (cdaddr statement))))
+(define finallybody
+  (lambda (statement)
+    (cadr (cadddr statement))))
+(define errorName
+  (lambda (statement)
+    (caar (cdaddr statement))))
 
 ; These hellper functions define the parts of a defined function
 (define function-name cadr)
