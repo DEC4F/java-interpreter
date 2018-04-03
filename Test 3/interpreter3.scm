@@ -87,14 +87,6 @@
   (lambda (statement environment return break continue throw)
     (interpret-value statement environment return break continue throw) environment))
 
-; Return the state after we call a function. Mainly used to deal with global variables.
-(define interpret-funstate
-  (lambda (statement environment return break continue throw)
-    (let* ((closure (lookup (function-name statement) environment))
-           (new-environment (cons (new-frame-parameter (formal-parameter closure) (actual-parameter statement) environment return break continue throw) environment)))
-         (interpret-statement-list (removereturn (function-body closure)) new-environment return default-break default-continue throw))))
-    
-
 ; Adds a new variable binding to the environment.  There may be an assignment with the variable
 (define interpret-declare
   (lambda (statement environment return break continue throw)
@@ -227,17 +219,6 @@
       (call/cc
        (lambda (return)
          (interpret-statement-list (function-body closure) new-environment return default-break default-continue throw)))) ))
-
-; Evaluates all possible boolean and arithmetic expressions, including constants and variables.
-(define eval-expression
- (lambda (expr environment)
-    (cond
-      ((number? expr) expr)
-      ((eq? expr 'true) #t)
-      ((eq? expr 'false) #f)
-      ((not (list? expr)) (lookup expr environment))
-      (else (eval-operator expr environment)))))
-
 
 ;-----------------
 ; HELPER FUNCTIONS
