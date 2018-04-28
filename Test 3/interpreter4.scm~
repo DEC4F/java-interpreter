@@ -1,0 +1,707 @@
+;Group Number: 4
+;Group Member: Shihong Ling, Mingxuan Ju, Stanley Tian
+(load "classParser.scm")
+
+
+;-----------------
+; Main Interpret Part
+;-----------------
+(define interpret
+  (lambda (file)
+    (scheme->language
+     (let*
+         ((env (interpret-outer (parser file) (newenv) (default-collection))))
+     (call/cc
+      (lambda (return)
+        (interpret-value (list funcall (list 'dot class 'main)) env (set-return return (default-collection)))))
+       ))))
+
+(define interpret-outer
+  (lambda (block env collection)
+    (cond
+      ((null? block) env)
+      ((eq? (car (car block)) 'class) (interpret-outer (cdr block) (interpret-class (car block) env collection) collection))
+      (else (myerror "scope is not valie for the class: " block)))))
+
+;-----------------
+; Default Collection (Return + Break + Cont + Throw + Class + Instance + Current Class)
+;-----------------
+(define return-in-c car)
+(define break-in-c cadr)
+(define cont-in-c caddr)
+(define class-in-c (lambda (l) (list-ref l 4)))
+(define instance-class-in-c (lambda (l) (list-ref l 5)))
+(define current-class-in-c (lambda (l) (list-ref l 6)))
+
+(define default-return
+  (lambda (v)
+    (myerror "Return used outside of the function call")))
+    
+(define default-break
+  (lambda (env)
+    (myerror "Break used outside of loop")))
+
+(define default-continue
+  (lambda (env)
+    (myerror "Continue used outside of loop")))
+
+(define default-throw
+  (lambda (v env)
+    (myerror "Uncaught exception thrown")))
+
+(define default-collection
+  (lambda ()
+    (list default-return default-break default-continue default-throw 'null 'null 'null)))
+
+(define set-return
+  (lambda (return c)
+    (replace 0 return c)))
+
+(define set-break
+  (lambda (break c)
+    (replace 1 break c)))
+
+(define set-cont
+  (lambda (cont c)
+    (replace 2 cont c)))
+
+(define set-throw
+  (lambda (throw c)
+    (replace 3 throw c)))
+
+(define set-class
+  (lambda (class c)
+    (replace 4 class c)))
+
+(define set-instance
+  (lambda (instance c)
+    (replaceVal 5 instance c)))
+
+(define set-current
+  (lambda (currclass c)
+    (replaceVal 6 currclass c)))
+
+;-----------------
+; Abstractions
+;-----------------
+; These helper functions define the operator and operands of a value expression
+(define operator car)
+(define operand1 cadr)
+(define operand2 caddr)
+(define operand3 cadddr)
+
+(define exists-operand2?
+  (lambda (statement)
+    (not (null? (cddr statement)))))
+
+(define exists-operand3?
+  (lambda (statement)
+    (not (null? (cdddr statement)))))
+
+(define statement-list?
+  (lambda (stmt)
+    (list? (car stmt)) ))
+
+; These helper functions define the parts of the various statement types
+(define statement-type operator)
+(define get-expr operand1)
+(define get-declare-var operand1)
+(define get-declare-value operand2)
+(define exists-declare-value? exists-operand2?)
+(define get-assign-lhs operand1)
+(define get-assign-rhs operand2)
+(define get-condition operand1)
+(define get-then operand2)
+(define get-else operand3)
+(define get-body operand2)
+(define exists-else? exists-operand3?)
+(define get-try operand1)
+(define get-catch operand2)
+(define get-finally operand3)
+(define get-binding operand1)
+
+; Check whether the try is followed by catch
+(define hascatch?
+  (lambda (statement)
+    (not (null? (caddr statement)))))
+
+;Check whether the try has finally
+(define hasfinally?
+  (lambda (statement)
+    (not (null? (cadddr statement)))))
+(define trybody cadr)
+(define catchbody
+  (lambda (statement)
+    (cdr (cdaddr statement))))
+(define finallybody
+  (lambda (statement)
+    (cadr (cadddr statement))))
+(define errorName
+  (lambda (statement)
+    (caar (cdaddr statement))))
+
+; These hellper functions define the parts of a defined function
+(define function-name cadr)
+(define function-body cadr)
+(define function-env caddr)
+(define get-parameter caddr)
+(define get-funcbody cadddr)
+(define formal-parameter car)
+(define actual-parameter cddr)
+(define first-para car)
+(define rest-para cdr)
+
+;-----------------
+; interpret-value part
+;-----------------
+(define interpret-value
+  (lambda (statement env collection)
+    (cond
+      ((and (list? statement) (eq? '= (operator statement))) (M-value-assign statement env collection))
+      ((and (list? statement) (eq? '= (operator statement))) (M-value-assign statement env collection))
+      ((and (list? statement) (eq? '= (operator statement))) (M-value-assign statement env collection))
+      ((and (list? statement) (eq? '= (operator statement))) (M-value-assign statement env collection))
+      ((list? statement) (M-value-expression statement env collection))
+      (else M-value-atom statement env collection))  ))
+
+(define M-value-expression
+  (lambda (statement env collection)
+    (cond
+      ((eq? '! (operator statement)) (not (interpret-value (operand1 statement) env collection)))
+      ((and (eq? '- (operator statement)) (= 2 (length statement))) (- 0 (interpret-value (operand1 expr) env collection)))
+      ((eq? '+ (operator statement)) (+ (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '- (operator statement)) (- (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '* (operator statement)) (* (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '/ (operator statement)) (quotient (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '% (operator statement)) (remainder (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '== (operator statement)) (== (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '!= (operator statement)) (!= (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '< (operator statement)) (< (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '> (operator statement)) (> (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '<= (operator statement)) (<= (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '>= (operator statement)) (>= (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '|| (operator statement)) (or (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((eq? '&& (operator statement)) (and (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      (else (myerror "Unknown operator:" (operator expr))))))
+
+(define M-value-atom
+  (lambda (statement env collection)
+    (cond
+      ((or (boolean? statement) (number? statement)) statement)
+      ((eq? statement 'true) #t)
+      ((eq? statement 'false) #f)
+      ((eq? 'undefined (M-value-variable statement env collection)) (myerror "Undefined variable: " statement))
+      (else (M-value-variable statement env collection)) )))
+
+(define M-value-assign
+  (lambda (statement env collection)
+    (let* ((var (find-var (get-assign-lhs statement) env collection))
+           (value (interpret-value (get-assign-rhs statement) env collection)) )
+      (set-box! var value)
+      value)))
+
+(define M-value-var
+  (lambda (statement env collection)
+    (let ((box (find-var-box statement env (current-class-in-c collection) (instance-class-in-c collection))))
+      (cond
+        ((eq? box 'no_value) (myerror "can not find variable: " statement))
+        (else (unbox box)) ))))
+
+(define M-value-dot
+  (lambda (statement env collection)
+    (unbox (find-dot-var statement env collection)) ))
+
+(define eval-funcall
+  (lambda (statement environment return break continue throw)
+    (let* ((closure (lookup-val (function-name statement) environment))
+           (outer ((function-env closure) environment))
+           (new-environment (cons (new-frame-parameter (formal-parameter closure) (actual-parameter statement) environment return break continue throw) outer)))
+      (call/cc
+       (lambda (return)
+         (interpret-statement-list (function-body closure) new-environment return default-break default-continue throw)))) ))
+
+
+    
+
+      
+;-----------------
+; interpret-statement part
+;-----------------
+; interprets a list of statements.  The environment from each statement is used for the next ones.
+(define interpret-statement-list
+  (lambda (statement-list env collection)
+    (if (null? statement-list)
+        environment
+        (interpret-statement-list (cdr statement-list)
+                                      (interpret-statement (car statement-list) env collection)
+                                  collection))))
+
+; interpret a statement in the environment with continuations for return, break, continue, throw
+(define interpret-statement
+  (lambda (statement env collection)
+    (cond
+      ((null? statement) environment)
+      ((not (list? statement)) environment)
+      ((statement-list? statement) (interpret-statement-list statement env collection))
+      ((eq? 'function (statement-type statement)) (interpret-function statement env collection))
+      ((eq? 'funcall (statement-type statement)) (interpret-funcall statement env collection))
+      ((eq? 'return (statement-type statement)) (interpret-return statement env collection))
+      ((eq? 'var (statement-type statement)) (interpret-declare statement env collection))
+      ((eq? '= (statement-type statement)) (interpret-assign statement env collection))
+      ((eq? 'if (statement-type statement)) (interpret-if statement env collection))
+      ((eq? 'while (statement-type statement)) (interpret-while statement env collection))
+      ((eq? 'continue (statement-type statement)) ((cont-in-c collection) env))
+      ((eq? 'break (statement-type statement)) ((break-in-c collection) env))
+      ((eq? 'begin (statement-type statement)) (interpret-block statement env collection))
+      ((eq? 'throw (statement-type statement)) (interpret-throw statement env collection))
+      ((eq? 'try (statement-type statement)) (interpret-try statement env collection))
+      (else (myerror "Unknown statement:" (statement-type statement))))))
+
+
+
+
+; Calls the return continuation with the given expression value
+(define interpret-return
+  (lambda (statement env collection)
+    ((return-in-c collection) (interpret-value (get-expr statement) env collection))))
+
+; Defines functions
+(define interpret-function
+  (lambda (statement env collection)
+    (let ((f (function-name statement)))
+      (add-to-env f (list (get-parameter statement)
+                          (get-funcbody statement)
+                          (lambda (env) (get-env f env))
+                          (lambda (env) (class-in-collection collection))
+                          (lambda (v) v)) env) )))
+                          
+; Calls functions
+(define interpret-funcall
+  (lambda (statement env collection)
+    (begin (interpret-value statement env collection) env)))
+
+; Adds a new variable binding to the environment.  There may be an assignment with the variable
+(define interpret-declare
+  (lambda (statement env collection)
+    (if (exists-declare-value? statement)
+        (add-to-env (get-declare-var statement) (interpret-value (get-declare-value statement) env collection)
+                (interpret-statement (get-declare-value statement) env collection) )
+        (add-to-env (get-declare-var statement) 'undefined env))))
+
+; Updates the environment to add an new binding for a variable
+(define interpret-assign
+  (lambda (statement env collection)
+    (begin (M-value-assign statement env collection) env) ))
+
+; We need to check if there is an else condition.  Otherwise, we evaluate the expression and do the right thing.
+(define interpret-if
+  (lambda (statement env collection)
+    (cond
+      ((interpret-value (get-condition statement) env collection) (interpret-statement (get-then statement) env collection))
+      ((exists-else? statement) (interpret-statement (get-else statement) env collection))
+      (else env))))
+
+; Interprets a while loop.  We must create break and continue continuations for this loop
+(define interpret-while
+  (lambda (statement env collection)
+    (call/cc
+     (lambda (new-break)
+       (letrec
+           ((loop (lambda (condition body environment)
+                        (cond
+                          ((interpret-value condition env (set-break new-break collection))
+                            (loop condition body
+                                  (call/cc (lambda (new-continue)
+                                                            (interpret-statement body env (set-cont new-continue collection))))))
+                          (else env) ))))
+         (loop (get-condition statement) (get-body statement) env) )))))
+
+; Interprets a block.  The break, continue, and throw continuations must be adjusted to pop the environment
+(define interpret-block
+  (lambda (statement env collection)
+    (pop-frame
+     (interpret-statement-list (cdr statement)
+                               (push-frame env)
+                               (set-break (lambda (v) ((break-in-c collection) (pop-frame v))) (set-cont (lambda (v) ((cont-in-c collection) (pop-frame v))) collection) ) ))))
+                                         
+
+; We use a continuation to throw the proper value. Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
+(define interpret-throw
+  (lambda (statement env collection)
+    ((throw-in-c collection) (interpret-value (get-expr statement) env collection))))
+
+; need revise try catch finally
+; Code for try part
+(define interpret-try
+  (lambda (statement env collection)
+    (cond
+      ((not (hascatch? statement)) (interpret-statement (finallybody statement) (interpret-statement (trybody statement) env collection) collection))
+      ((not (hasfinally? statement))
+       (call/cc
+        (lambda (new_throw)
+          (interpret-statement (trybody statement) env (set-throw (lambda (e new_state) (new_throw (interpret-catch (catchbody statement) e (errorName statement) new_state collection))) collection))
+          )))
+      (else (interpret-statement (finallybody statement)
+                     (call/cc
+                      (lambda (new_throw)
+                        (interpret-statement (trybody statement) env (set-throw
+                                 (lambda (e new_state) (new_throw (interpret-catch (catchbody statement) e (errorName statement) new_state collection))) collection)))
+                     collection)))))
+; Code for catch part
+(define interpret-catch
+  (lambda (statement error errorName env collection)
+      (interpret-statement statement (add-to-env errorName error env) collection)))
+
+
+;------------------------
+; Interpret class part
+;------------------------
+
+(define param caddr)
+(define bod cadddr)
+  
+(define interpret-class
+  (lambda (statement env collection)
+    (let* ((name (get-declare-var statement))
+           (extends (get-declare-value statement))
+           (parent (if (null? extends) 'null (check-binding (binding extends) env)))
+           (body (get-funcbody statement))
+           (init (newclass parent name))
+           (class (M-class-statement body env (set-current init (set-class init collection) ))))
+      (add-to-env name class env)) ))
+
+(define M-class-static-declare
+  (lambda (stmt env collection)
+    (let* ((class (class-in-c collection)))
+      (set-class-field (add-env (class-field class) (cadr stmt)
+                               (if (= 3 (length stmt)) (interpret-value (param stmt) env collection) 'undefined)) class) )))
+
+; Returns the binding after class declaration
+(define M-class-declare
+  (lambda (stmt env collection)
+    (let* ((class (class-in-c collection)))
+      (set-class-instance (add-to-layer (instance-of-class class) (cadr stmt)
+                     (if (= 3 (length stmt)) (interpret-value (param stmt) env collection) 'undefined)) class) )))
+
+
+; Adds the function to the class and returns it
+(define M-class-func-declare
+  (lambda (f env static collection)
+    (let* ((fname (cadr f))
+           (class (class-in-c collection))
+           (cname (class-name class)))
+      (set-class-method
+       (add-env fname
+                (list (param f) (bod f)
+                      (lambda (env) 
+                        (let ((class (check-binding cname env)))
+                          (get-env cname env)))
+                      (lambda (env)   
+                        (check-binding cname env))
+                      (if static (lambda (v) 'null) (lambda (v) v))) (class-method class)) class) )))
+
+; Executes each statement and returns the class
+(define M-class
+  (lambda (stmt env collection)
+    (cond
+     ((null? stmt) (class-in-c collection))
+     ((eq? 'static-function (statement-type stmt)) (M-class-func-declare stmt env #t collection))
+     ((eq? 'function (statement-type stmt)) (M-class-func-declare stmt env #f collection))
+     ((eq? 'static-var (statement-type stmt)) (M_class_staticDeclare stmt env collection))
+     ((eq? 'var (statement-type stmt)) (M_class_declare stmt env collection))
+     ((list? stmt) (myerror "invalid statement: " stmt))
+     (else (class-in-c collection)) )))
+
+; interprets each statement in class declaration
+(define M-class-stmt
+  (lambda (block env collection)
+    (cond
+      ((null? block) (class-in-c collection))
+      (else (M-class-stmt (cdr block) env
+                               (let ((newclass (M-class (car block) env collection)))
+                                 (setcollection_curClass (set-class newclass collection) newclass)) )) )))
+
+
+ 
+;------------------------
+; Class related abstraction and helper method
+;------------------------
+(define class-parent cadr)
+(define class-name caddr)
+(define class-field cadddr)
+(define class-instance cadr)
+(define instance-value caddr)
+
+(define newclass
+  (lambda (parent name)
+    (list 'class parent name
+          (if (eq? parent 'null) (newframe) (class-field parent))
+          (if (eq? parent 'null) (newframe) (class-method parent))
+          (if (eq? parent 'null) (newframe) (instance-of-class parent)) )))
+
+;; Creates a new instance of the class. 
+(define newinstance
+  (lambda (class)
+    (list 'inst class '())))
+
+(define class-method
+ (lambda (l)
+  (list-ref l 4)))
+
+(define instance-of-class 
+	(lambda (l) 
+		(list-ref l 5)))
+
+(define set-class-field
+  (lambda (fields class)
+    (replace 3 fields class)))
+
+(define set-class-method
+  (lambda (methods class)
+    (replace 4 methods class)))
+
+(define set-class-instance
+  (lambda (inst class)
+    (replaceVal 5 inst class)))
+
+; Modify an instance.
+(define set-instant-value
+  (lambda (inst values)
+    (list 'inst (class-instance inst) values)))
+
+(define find-var-box
+  (lambda (var env class instance)
+    (cond
+     ((eqv? var 'this) (box instance))
+     ((contains? var env) (check-box var env))
+     ((and (not (eq? 'null class)) (check-frame (class_field class) var)) (lookup-in-frame (class_field class) var))
+     ((and (not (eq? 'null instance)) (check-frame (list (car (instance-of-class class)) (instance-value instance)) var))
+      (lookup-in-frame (list (car (instanceOfClass class)) (instance_vals instance)) var))
+     (else 'no_value))))
+
+; Function to look up the value using the envionment 
+(define find-func-env
+  (lambda (var env class instance)
+    (cond
+     ((contains? var env) (check-binding var env))
+     ((check-frame var (class-method class)) (lookup-in-env var (class_method class)))
+     (else (myerror "can not find function: " var)))))
+
+; Return the class contained by the variable 
+(define find-var-class
+  (lambda (var env collection)
+    (cond
+     ((not (list? var)) (myerror "wrong format for dot: " var))
+     ((eq? (object var) 'class) (list 'null var))
+     ((eq? (object var) 'inst) (list var (class-instance var)))
+     (else (myerror "wrong use of dot operator!")))))
+
+; Converts the physical symbol and adds to a pair 
+(define convert
+  (lambda (statement env class collection)
+    (if (list? leftside)
+        (cond
+         ((eq? (car statement) 'funcall) (find-var-class (M-value-funcall statement env collection) env collection))
+         ((eq? (car statement) 'dot) (find-var-class (unbox (searchDotVar statement env collection)) env collection))
+         ((eq? (car statement) 'new) (find-var-class (M-value-new statement env collection)  env collection)))
+        (let ((lookup (find-var-box statement env class (instance-in-c collection))))
+          (cond
+           ((eq? (car statement) 'this) (list (instance-in-c collection) (class-instance (instance-in-c collection))))
+           ((eq? (car statement) 'super) (list (instance-in-c collection) (class-parent class)))
+           ((eq? 'no_value lookup) (myerror "can not found variable"))
+           (else (find-var-class (unbox lookup) env collection)))) )))
+
+; Return the dot function within the statement 
+(define find-dot-func
+  (lambda (stmt env collection)
+    (let (newstate (class-instance (convert (function-name stmt) env (class-in-c collection) collection)))
+      (cons (find-func-env (function-env stmt) (newstate) (function-name class-instance) (object class-instance)) class-instance) )))
+
+; Looks for the dot function given the statement 
+(define find-func
+  (lambda (stmt env collection)
+    (cond
+      ((list? stmt) (find-dot-func stmt env collection))
+      (else (list (find-func-env stmt env (class-in-c collection) (instance-in-c collection)) (instance-in-c collection) (class-in-c collection))) )))
+
+; Looks up the dot variable associated with the dot func 
+(define find-dot-var
+  (lambda (stmt env collection)
+    (let (newstate (class-instance (convert (class-instance stmt) env (current-in-c collection) collection)))
+      (find-var-box (find-func-env stmt) (newstate) (class-parent class-instance) (vartype class-instance)) )))
+
+; Looks up the variable associated with the function 
+(define find-var
+  (lambda (stmt env collection)
+    (cond
+      ((list? stmt) (find-dot-var stmt env collection))
+      (else (find-var-box stmt env (current-in-c collection) (instance-in-c collection))) )))
+
+
+;------------------------
+; Frame Operation Function
+;------------------------
+
+; Create an empty frame: a frame is two lists, the first are the variables and the second is the "store" of values
+(define newframe
+  (lambda ()
+    '(() ())))
+
+; Add a new variable/value pair to the frame.
+(define add-to-frame
+  (lambda (var val frame)
+    (list (cons var (variables frame)) (cons (scheme->language val) (store frame)))))
+
+; Add an environment
+(define add-env
+  (lambda (var val env)
+    (add-to-frame var (box value) env)))
+
+
+; Get the value in frame
+(define lookup-in-frame
+  (lambda (var frame)
+    (let ((index (indexof var (variables frame)))
+          (cond
+            ((= index -1) 'no_value)
+            (else (list-ref (values layer) (- (length (variables frame)) index 1)))) ))))
+
+; Get the value in environment and unbox it
+(define lookup-in-env
+  (lambda (var env)
+    (let ((value (look-in-frame var env)))
+      (cond
+        ((eq? value 'no_value) 'no_value)
+        (else (unbox value)) ))))
+
+; Check whether the frame contain variable
+(define check-frame
+  (lambda (var frame)
+    (not (= -1 (indexof var (car layer))))))
+
+;------------------------
+; Environment/State Functions
+;------------------------
+(define removeframe cdr)
+(define firstframe car)
+(define restframe cdr)
+
+; a new empty environment
+(define newenv
+  (lambda ()
+    '((() ()))))
+
+; Add an empty frame into environment
+(define addframe
+  (lambda (env)
+    (cons (newframe) env)))
+
+; Add variable and value into environment
+(define add-to-env
+  (lambda (var value env)
+    (cond
+      ((check-frame var (car env)) (myerror "error: variable is being re-declared:" var))
+      (else (cons (add-to-frame var (box value) (firstframe env)) (restframe env))) )))
+
+; Get the environment for the function 
+(define get-env
+  (lambda (f env)
+    (cond
+      ((null? env) (myerror "error: can not find function:" var))
+      (else (let ((value (lookup-in-frame f (firstframe env))))
+              (cond
+                ((eq? value 'no_value) (get-env f (restframe env)))
+                (else env)))))))
+
+; Check and get value in environment
+(define check-binding
+  (lambda (var env)
+    (unbox (check-box var env))))
+(define check-box
+  (lambda (var env)
+    (let ((value (get-binding var env)))
+      (cond
+        ((eq? value 'no_value) (myerror "error: binding is not found for variable:" var))
+        (else value)))))
+(define get-binding
+  (lambda (var env)
+    (cond
+      ((null? env) 'no_value)
+      (else (let ((value (lookup-in-frame var (firstframe env))))
+              (cond
+                ((eq? value 'no_value) (get-binding var (restframe env)))
+                (else value)))))))
+
+; Check whether the environment contains the variable
+(define contains?
+  (lambda (var env)
+    (not (eq? (get-binding var env) 'no_value))))
+
+;------------------------
+; Usefule helper method
+;------------------------
+; Get the location of a name in a list of names
+(define indexof
+  (lambda (var l)
+    (cond
+      ((null? l) -1)  ; should not happen
+      ((eq? var (car l)) 0)
+      (else (+ 1 (indexof var (cdr l)))))))
+
+; Returns the list of variables from a frame
+(define variables
+  (lambda (frame)
+    (car frame)))
+
+; Returns the store from a frame
+(define values
+  (lambda (frame)
+    (cadr frame)))
+
+; Checks to see if two values are equal
+(define ==
+  (lambda (x y)
+    (cond
+     ((and (number? x) (number? y)) (= x y))
+     ((and (atom? x) (atom? y)) (eqv? x y))
+     ((and (list? x) (list? y)) (equal? x y))
+     (else #f) )))
+
+; Checks to see if two values are NOT equal 
+(define !=
+  (lambda (x y)
+    (not (== x y)) ))
+
+; Replace value in a list at specifix index
+(define replace
+  (lambda (index value list)
+    (cond
+      ((= 0 index) (cons value (cdr list)))
+      (else (cons (car list) (replace (- index 1) value (cdr list)))))))
+
+; Functions to convert the Scheme #t and #f to our languages true and false, and back.
+(define language->scheme
+  (lambda (v) 
+    (cond 
+      ((eq? v 'false) #f)
+      ((eq? v 'true) #t)
+      (else v))))
+
+(define scheme->language
+  (lambda (v)
+    (cond
+      ((eq? v #f) 'false)
+      ((eq? v #t) 'true)
+      (else v))))
+
+; Because the error function is not defined in R5RS scheme, I create my own:
+(define error-break (lambda (v) v))
+(call-with-current-continuation (lambda (k) (set! error-break k)))
+
+(define myerror
+  (lambda (str . vals)
+    (letrec ((makestr (lambda (str vals)
+                        (if (null? vals)
+                            str
+                            (makestr (string-append str (string-append " " (symbol->string (car vals)))) (cdr vals))))))
+      (error-break (display (string-append str (makestr "" vals)))))))
