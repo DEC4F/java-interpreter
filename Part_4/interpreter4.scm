@@ -189,11 +189,15 @@
 ;define M-value-new
 (define M-value-new
   (lambda (statement env collection)
-    (let ((class (check-binding (binding statement) env)))
+    (let ((class (check-binding (binding statement) (get-base-frame env))))
       (cond
         ((not (and (list? class) (eq? (car class) 'class))) (myerror "error: invalid class: " (cadr statement)))
         (else (set-instant-value (newinstance class) (box-list (binding (instance-of-class class)))))))))
-
+(define get-base-frame
+  (lambda (env)
+    (if (null? (cdr env))
+        env
+        (get-base-frame (cdr env)))))
 (define box-list
   (lambda (l)
     (map box l)))
@@ -386,10 +390,16 @@
 ; Get the location of a name in a list of names
 (define indexof
   (lambda (var l)
+    (call/cc
+     (lambda (break)
+       (indexof-h var l break)))))
+(define indexof-h
+  (lambda (var l break)
     (cond
-      ((null? l) -1)  ; should not happen
+      ((null? l) (break -1))  ; should not happen
       ((eq? var (car l)) 0)
-      (else (+ 1 (indexof var (cdr l)))))))
+      (else (+ 1 (indexof-h var (cdr l) break))))))
+
 
 ; Returns the list of variables from a frame
 (define variables
