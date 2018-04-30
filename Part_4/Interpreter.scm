@@ -6,6 +6,7 @@
 ;-----------------
 ; Main Interpret Part
 ;-----------------
+; Interpret input program file and return result
 (define interpret
   (lambda (file class)
     (scheme->language
@@ -16,6 +17,7 @@
         (interpret-value (list 'funcall (list 'dot class 'main)) env (set-return return (default-collection)))))
        ))))
 
+; Interpret outer scope of the program
 (define interpret-outer
   (lambda (block env collection)
     (cond
@@ -26,57 +28,72 @@
 ;-----------------
 ; Default Collection (Return + Break + Cont + Throw + Class + Instance + Current Class)
 ;-----------------
+
+; These helper methods define each part of collection
 (define return-in-c car)
 (define break-in-c cadr)
 (define cont-in-c caddr)
+(define throw-in-c cadddr)
 (define class-in-c (lambda (l) (list-ref l 4)))
 (define instance-in-c (lambda (l) (list-ref l 5)))
 (define current-in-c (lambda (l) (list-ref l 6)))
 
+; Default value for return
 (define default-return
   (lambda (v)
     (myerror "error: return used outside of the function call")))
 
+; Default value for break
 (define default-break
   (lambda (env)
     (myerror "error: break used outside of loop")))
 
+; Default value for continue
 (define default-continue
   (lambda (env)
     (myerror "error: continue used outside of loop")))
 
+; Default value for throw 
 (define default-throw
   (lambda (v env)
     (myerror "error: uncaught exception thrown")))
 
+; Default value for collection
 (define default-collection
   (lambda ()
     (list default-return default-break default-continue default-throw 'null 'null 'null)))
 
+; Set up return
 (define set-return
   (lambda (return c)
     (replace 0 return c)))
 
+; Set up break
 (define set-break
   (lambda (break c)
     (replace 1 break c)))
 
+; Set up continue
 (define set-cont
   (lambda (cont c)
     (replace 2 cont c)))
 
+; Set up throw 
 (define set-throw
   (lambda (throw c)
     (replace 3 throw c)))
 
+; Set up class
 (define set-class
   (lambda (class c)
     (replace 4 class c)))
 
+; Set up instance
 (define set-instance
   (lambda (instance c)
     (replace 5 instance c)))
 
+; Set up current instance
 (define set-current
   (lambda (currclass c)
     (replace 6 currclass c)))
@@ -84,24 +101,6 @@
 ;-----------------
 ; Abstractions
 ;-----------------
-; These helper functions define the operator and operands of a value expression
-(define operator car)
-(define operand1 cadr)
-(define operand2 caddr)
-(define operand3 cadddr)
-
-(define exists-operand2?
-  (lambda (statement)
-    (not (null? (cddr statement)))))
-
-(define exists-operand3?
-  (lambda (statement)
-    (not (null? (cdddr statement)))))
-
-(define statement-list?
-  (lambda (statement)
-    (list? (car statement)) ))
-
 ; These helper functions creates abstraction on conditions in finding M value of a statement
 (define negate? (lambda (statement) (eq? '! (operator statement))))
 (define negnum? (lambda (statement) (and (eq? '- (operator statement)) (= 2 (length statement)))))
@@ -119,6 +118,23 @@
 (define or-stmt? (lambda (statement) (eq? '|| (operator statement))))
 (define and-stmt? (lambda (statement) (eq? '&& (operator statement))))
 
+; These helper functions define the operator and operands of a value expression
+(define operator car)
+(define operand1 cadr)
+(define operand2 caddr)
+(define operand3 cadddr)
+
+(define exists-operand2?
+  (lambda (statement)
+    (not (null? (cddr statement)))))
+
+(define exists-operand3?
+  (lambda (statement)
+    (not (null? (cdddr statement)))))
+
+(define statement-list?
+  (lambda (statement)
+    (list? (car statement)) ))
 
 ; These helper functions define the parts of the various statement types
 (define vartype car)
@@ -149,6 +165,8 @@
 (define hasfinally?
   (lambda (statement)
     (not (null? (cadddr statement)))))
+
+; These helper methods defines parts of try-catch-finally
 (define trybody cadr)
 (define catchbody
   (lambda (statement)
@@ -156,6 +174,9 @@
 (define finallybody
   (lambda (statement)
     (cadr (cadddr statement))))
+(define catch-var
+  (lambda (catch-statement)
+    (car (operand1 catch-statement))))
 (define errorName
   (lambda (statement)
     (caar (cdaddr statement))))
@@ -174,6 +195,7 @@
 ;-----------------
 ; interpret-value part
 ;-----------------
+; Interpret statement and get the value of it
 (define interpret-value
   (lambda (statement env collection)
     (cond
@@ -184,11 +206,12 @@
       ((list? statement) (M-value-expression statement env collection))
       (else (M-value-atom statement env collection))  )))
 
+; Get the value of expression
 (define M-value-expression
   (lambda (statement env collection)
     (cond
       ((negate? statement) (not (interpret-value (operand1 statement) env collection)))
-      ((negnum? statement) (- 0 (interpret-value (operand1 expr) env collection)))
+      ((negnum? statement) (- 0 (interpret-value (operand1 statement) env collection)))
       ((addition? statement) (+ (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
       ((subtraction? statement) (- (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
       ((multiply? statement) (* (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
@@ -204,7 +227,8 @@
       ((and-stmt? statement) (and (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
       (else (myerror "error: unknown operator:" (operator statement))))))
 
-;define M-value-new
+
+; Get the value of "new" object
 (define M-value-new
   (lambda (statement env collection)
     (let ((class (check-binding (binding statement) (get-base-frame env))))
@@ -212,16 +236,17 @@
         ((not (and (list? class) (eq? (car class) 'class))) (myerror "error: invalid class: " (cadr statement)))
         (else (set-instant-value (newinstance class) (box-list (binding (instance-of-class class)))))))))
 
+; Helper methods for M-value-new
 (define get-base-frame
   (lambda (env)
     (if (null? (cdr env))
         env
         (get-base-frame (cdr env)))))
-
 (define box-list
   (lambda (l)
     (map box l)))
 
+; Get the value of an atom
 (define M-value-atom
   (lambda (statement env collection)
     (cond
@@ -231,6 +256,7 @@
       ((eq? 'undefined (M-value-var statement env collection)) (myerror "Undefined variable: " statement))
       (else (M-value-var statement env collection)) )))
 
+; Get the value of an assignment (ex: return "a = 1")
 (define M-value-assign
   (lambda (statement env collection)
     (let* ((var (find-var (get-assign-lhs statement) env collection))
@@ -238,6 +264,7 @@
       (set-box! var value)
       value)))
 
+; Get the value of an variable in environment
 (define M-value-var
   (lambda (statement env collection)
     (let ((box (find-var-box statement env (current-in-c collection) (instance-in-c collection))))
@@ -245,10 +272,12 @@
         ((eq? box 'no_value) (myerror "error: can not find variable: " statement))
         (else (unbox box)) ))))
 
+; Get the value of a "dot" object
 (define M-value-dot
   (lambda (statement env collection)
     (unbox (find-dot-var statement env collection)) ))
 
+; Get the value of a function call
 (define M-value-funcall
   (lambda (f env collection)
     (let* ((l (find-func (function-name f) env collection))
@@ -265,7 +294,7 @@
        (lambda (return)
          (interpret-statement-list (function-body closure) newenv (set-class class (set-return return (set-break error (set-instance instance (set-current currclass (set-cont error collection))))))
                                    ))))))
-
+; Helper method for M-value-funcall
 (define new-frame-parameter
   (lambda (formal actual env collection)
     (cond
@@ -278,6 +307,7 @@
                           (box (interpret-value(first-para actual) env collection))
                           (new-frame-parameter (rest-para formal) (rest-para actual) env collection) )) )))
 
+      
 ;-----------------
 ; interpret-statement part
 ;-----------------
@@ -375,12 +405,15 @@
      (interpret-statement-list (cdr statement)
                                (addframe env)
                                (set-break (lambda (v) ((break-in-c collection) (removeframe v))) (set-cont (lambda (v) ((cont-in-c collection) (removeframe v))) collection) ) ))))
+                                         
 
 ; We use a continuation to throw the proper value. Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
   (lambda (statement env collection)
-    ((throw-in-c collection) (interpret-value (get-expr statement) env collection))))
+    ((throw-in-c collection) (interpret-value (get-expr statement) env collection) env)))
 
+; To interpret a try block, we must adjust  the return, break, continue continuations to interpret the finally block if any of them are used.
+; We must create a new throw continuation and then interpret the try block with the new continuations followed by the finally block with the old continuations
 (define interpret-try
   (lambda (statement environment collection)
     (call/cc
@@ -399,7 +432,6 @@
 (define make-try-block
   (lambda (try-statement)
     (cons 'begin try-statement)))
-
 (define make-finally-block
   (lambda (finally-statement)
     (cond
@@ -407,6 +439,8 @@
       ((not (eq? (statement-type finally-statement) 'finally)) (myerror "Incorrectly formatted finally block"))
       (else (cons 'begin (cadr finally-statement))))))
 
+; Create a continuation for the throw.  If there is no catch, it has to interpret the finally block, and once that completes throw the exception.
+; Otherwise, it interprets the catch block with the exception bound to the thrown value and interprets the finally block when the catch is done
 (define create-throw-catch-continuation
   (lambda (catch-statement environment collection jump finally-block)
     (cond
@@ -417,7 +451,7 @@
                                      (removeframe (interpret-statement-list 
                                                  (get-body catch-statement) 
                                                  (add-to-env (catch-var catch-statement) ex (addframe env))
-                                                 (set-break (lambda (env2) (break (removeframe env2))) (set-cont (lambda (env2) (continue (removeframe env2))) (set-throw (lambda (v env2) (throw v (removeframe env2))) collection)))
+                                                 (set-break (lambda (env2) ((break-in-c collection) (removeframe env2))) (set-cont (lambda (env2) ((cont-in-c collection) (removeframe env2))) (set-throw (lambda (v env2) ((throw-in-c collection) v (removeframe env2))) collection)))
                                                  ))
                                      collection)))))))
 
@@ -449,6 +483,7 @@
   (lambda (frame)
     (cadr frame)))
 
+; Check whether input is an atom
 (define atom?
   (lambda (x)
     (and (not (pair? x)) (not (null? x))) ))
