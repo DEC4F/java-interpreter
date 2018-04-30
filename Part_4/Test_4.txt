@@ -18,3 +18,4 @@ class A {
     return a1.add(a2);
   }
 }
+

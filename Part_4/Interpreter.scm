@@ -193,11 +193,13 @@
       (cond
         ((not (and (list? class) (eq? (car class) 'class))) (myerror "error: invalid class: " (cadr statement)))
         (else (set-instant-value (newinstance class) (box-list (binding (instance-of-class class)))))))))
+
 (define get-base-frame
   (lambda (env)
     (if (null? (cdr env))
         env
         (get-base-frame (cdr env)))))
+
 (define box-list
   (lambda (l)
     (map box l)))
