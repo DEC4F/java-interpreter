@@ -64,4 +64,3 @@ class Square extends Rectangle {
     return max.area();
   }
 }
-   
