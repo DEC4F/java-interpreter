@@ -302,10 +302,10 @@
 (define interpret-function
   (lambda (f env collection)
     (let ((fname (function-name f)))
-      (add-to-env fname (list (get-parameter statement)
-                          (get-funcbody statement)
+      (add-to-env fname (list (get-parameter f)
+                          (get-funcbody f)
                           (lambda (env) (get-env f env))
-                          (lambda (env) (class-in-collection collection))
+                          (lambda (env) (class-in-c collection))
                           (lambda (v) v)) env) )))
                           
 ; Calls functions
