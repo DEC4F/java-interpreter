@@ -238,7 +238,7 @@
            (class (caddr l))
            (currclass ((cadddr closure) env))
            (class (if (eq? 'null instance) currclass class))
-           (outerenv env)
+           (outerenv ((caddr closure) env))
            (newenv (cons (new-frame-parameter (formal-parameter closure) (actual-parameter f) env collection) outerenv))
            (error (lambda (v) (myerror "error: illegal break or continue"))) )
       (call/cc
@@ -288,8 +288,8 @@
                            ((eq? 'continue (statement-type statement)) ((cont-in-c collection) env))
                            ((eq? 'break (statement-type statement)) ((break-in-c collection) env))
                            ((eq? 'begin (statement-type statement)) (interpret-block statement env collection))
-                           ((eq? 'try (statement-type statement)) (interpret-try statement env collection))
                            ((eq? 'throw (statement-type statement)) (interpret-throw statement env collection))
+                           ((eq? 'try (statement-type statement)) (interpret-try statement env collection))
                            (else env)))
       (else env))))
 
@@ -302,13 +302,12 @@
 (define interpret-function
   (lambda (f env collection)
     (let ((fname (function-name f)))
-      (add-to-env fname (list (get-parameter f)
-                          (get-funcbody f)
+      (add-to-env fname (list (get-parameter statement)
+                          (get-funcbody statement)
                           (lambda (env) (get-env f env))
-                          (lambda (env) (class-in-c collection))
+                          (lambda (env) (class-in-collection collection))
                           (lambda (v) v)) env) )))
-
-
+                          
 ; Calls functions
 (define interpret-funcall
   (lambda (statement env collection)
@@ -319,7 +318,7 @@
   (lambda (statement env collection)
     (cond
       ((= (length statement) 3) (add-to-env (get-declare-var statement) (interpret-value (get-declare-value statement) env collection) (interpret-statement (get-declare-value statement) env collection))) 
-      (else (add-to-env (get-declare-var statement) 'undefined env) ))))
+      (else (add-to-env (get-declare-var statement) 'undefined) env) )))
 
 ; Updates the environment to add an new binding for a variable
 (define interpret-assign
@@ -345,7 +344,7 @@
                           ((interpret-value condition env (set-break new-break collection))
                             (loop condition body
                                   (call/cc (lambda (new-continue)
-                                                            (interpret-statement body env (set-cont new-continue (set-break new-break collection)))))))
+                                                            (interpret-statement body env (set-cont new-continue collection))))))
                           (else env) ))))
          (loop (get-condition statement) (get-body statement) env) )))))
 
@@ -363,46 +362,27 @@
   (lambda (statement env collection)
     ((throw-in-c collection) (interpret-value (get-expr statement) env collection))))
 
+; need revise try catch finally
+; Code for try part
 (define interpret-try
-  (lambda (statement environment collection)
-    (call/cc
-     (lambda (jump)
-       (let* ((finally-block (make-finally-block (get-finally statement)))
-              (try-block (make-try-block (get-try statement)))
-              (new-return (lambda (v) (begin (interpret-block finally-block environment collection) (return v))))
-              (new-break (lambda (env) ((break-in-c collection) (interpret-block finally-block env collection))))
-              (new-continue (lambda (env) ((cont-in-c collection) (interpret-block finally-block env collection))))
-              (new-throw (create-throw-catch-continuation (get-catch statement) environment collection jump finally-block)))
-         (interpret-block finally-block
-                          (interpret-block try-block environment (set-return new-return (set-break new-break (set-cont new-continue (set-throw new-throw collection)))))
-                          collection))))))
-
-; helper methods so that I can reuse the interpret-block method on the try and finally blocks
-(define make-try-block
-  (lambda (try-statement)
-    (cons 'begin try-statement)))
-
-(define make-finally-block
-  (lambda (finally-statement)
+  (lambda (statement env collection)
     (cond
-      ((null? finally-statement) '(begin))
-      ((not (eq? (statement-type finally-statement) 'finally)) (myerror "Incorrectly formatted finally block"))
-      (else (cons 'begin (cadr finally-statement))))))
-
-(define create-throw-catch-continuation
-  (lambda (catch-statement environment collection jump finally-block)
-    (cond
-      ((null? catch-statement) (lambda (ex env) (throw ex (interpret-block finally-block env collection)))) 
-      ((not (eq? 'catch (statement-type catch-statement))) (myerror "Incorrect catch statement"))
-      (else (lambda (ex env)
-              (jump (interpret-block finally-block
-                                     (removeframe (interpret-statement-list 
-                                                 (get-body catch-statement) 
-                                                 (add-to-env (catch-var catch-statement) ex (addframe env))
-                                                 (set-break (lambda (env2) (break (removeframe env2))) (set-cont (lambda (env2) (continue (removeframe env2))) (set-throw (lambda (v env2) (throw v (removeframe env2))) collection)))
-                                                 ))
-                                     collection)))))))
-
+      ((not (hascatch? statement)) (interpret-statement (finallybody statement) (interpret-statement (trybody statement) env collection) collection))
+      ((not (hasfinally? statement))
+       (call/cc
+        (lambda (new_throw)
+          (interpret-statement (trybody statement) env (set-throw (lambda (e new_state) (new_throw (interpret-catch (catchbody statement) e (errorName statement) new_state collection))) collection))
+          )))
+      (else (interpret-statement (finallybody statement)
+                     (call/cc
+                      (lambda (new_throw)
+                        (interpret-statement (trybody statement) env (set-throw
+                                 (lambda (e new_state) (new_throw (interpret-catch (catchbody statement) e (errorName statement) new_state collection))) collection)))
+                     collection))))))
+; Code for catch part
+(define interpret-catch
+  (lambda (statement error errorName env collection)
+      (interpret-statement statement (add-to-env errorName error env) collection)))
 
 ;------------------------
 ; Usefule helper method
