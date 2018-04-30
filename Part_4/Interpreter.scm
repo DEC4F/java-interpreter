@@ -36,7 +36,7 @@
 (define default-return
   (lambda (v)
     (myerror "error: return used outside of the function call")))
-    
+
 (define default-break
   (lambda (env)
     (myerror "error: break used outside of loop")))
@@ -101,6 +101,24 @@
 (define statement-list?
   (lambda (statement)
     (list? (car statement)) ))
+
+; These helper functions creates abstraction on conditions in finding M value of a statement
+(define negate? (lambda (statement) (eq? '! (operator statement))))
+(define negnum? (lambda (statement) (and (eq? '- (operator statement)) (= 2 (length statement)))))
+(define addition? (lambda (statement) (eq? '+ (operator statement))))
+(define subtraction? (lambda (statement) (eq? '- (operator statement))))
+(define multiply? (lambda (statement) (eq? '* (operator statement))))
+(define division? (lambda (statement) (eq? '/ (operator statement))))
+(define mod? (lambda (statement) (eq? '% (operator statement))))
+(define compare? (lambda (statement) (eq? '== (operator statement))))
+(define neq? (lambda (statement) (eq? '!= (operator statement))))
+(define less? (lambda (statement) (eq? '< (operator statement))))
+(define greater? (lambda (statement) (eq? '> (operator statement))))
+(define leq? (lambda (statement) (eq? '<= (operator statement))))
+(define geq? (lambda (statement) (eq? '>= (operator statement))))
+(define or-stmt? (lambda (statement) (eq? '|| (operator statement))))
+(define and-stmt? (lambda (statement) (eq? '&& (operator statement))))
+
 
 ; These helper functions define the parts of the various statement types
 (define vartype car)
@@ -169,21 +187,21 @@
 (define M-value-expression
   (lambda (statement env collection)
     (cond
-      ((eq? '! (operator statement)) (not (interpret-value (operand1 statement) env collection)))
-      ((and (eq? '- (operator statement)) (= 2 (length statement))) (- 0 (interpret-value (operand1 expr) env collection)))
-      ((eq? '+ (operator statement)) (+ (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '- (operator statement)) (- (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '* (operator statement)) (* (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '/ (operator statement)) (quotient (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '% (operator statement)) (remainder (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '== (operator statement)) (== (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '!= (operator statement)) (!= (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '< (operator statement)) (< (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '> (operator statement)) (> (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '<= (operator statement)) (<= (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '>= (operator statement)) (>= (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '|| (operator statement)) (or (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
-      ((eq? '&& (operator statement)) (and (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((negate? statement) (not (interpret-value (operand1 statement) env collection)))
+      ((negnum? statement) (- 0 (interpret-value (operand1 expr) env collection)))
+      ((addition? statement) (+ (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((subtraction? statement) (- (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((multiply? statement) (* (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((division? statement) (quotient (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((mod? statement) (remainder (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((compare? statement) (== (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((neq? statement) (!= (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((less? statement) (< (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((greater? statement) (> (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((leq? statement) (<= (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((geq? statement) (>= (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((or-stmt? statement) (or (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
+      ((and-stmt? statement) (and (interpret-value (operand1 statement) env collection) (interpret-value (operand2 statement) env collection)))
       (else (myerror "error: unknown operator:" (operator statement))))))
 
 ;define M-value-new
@@ -260,7 +278,6 @@
                           (box (interpret-value(first-para actual) env collection))
                           (new-frame-parameter (rest-para formal) (rest-para actual) env collection) )) )))
 
-      
 ;-----------------
 ; interpret-statement part
 ;-----------------
@@ -358,7 +375,6 @@
      (interpret-statement-list (cdr statement)
                                (addframe env)
                                (set-break (lambda (v) ((break-in-c collection) (removeframe v))) (set-cont (lambda (v) ((cont-in-c collection) (removeframe v))) collection) ) ))))
-                                         
 
 ; We use a continuation to throw the proper value. Because we are not using boxes, the environment/state must be thrown as well so any environment changes will be kept
 (define interpret-throw
