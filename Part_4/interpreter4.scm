@@ -238,7 +238,7 @@
            (class (caddr l))
            (currclass ((cadddr closure) env))
            (class (if (eq? 'null instance) currclass class))
-           (outerenv ((caddr closure) env))
+           (outerenv env)
            (newenv (cons (new-frame-parameter (formal-parameter closure) (actual-parameter f) env collection) outerenv))
            (error (lambda (v) (myerror "error: illegal break or continue"))) )
       (call/cc
@@ -307,7 +307,8 @@
                           (lambda (env) (get-env f env))
                           (lambda (env) (class-in-c collection))
                           (lambda (v) v)) env) )))
-                          
+
+
 ; Calls functions
 (define interpret-funcall
   (lambda (statement env collection)
