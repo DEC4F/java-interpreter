@@ -1,5 +1,5 @@
 # Overview
-This is simeple interpreter written in Scheme for a Java/C-ish language. It supports some Java language features, including __object type__, __exception throwing__, __dot operator__, __gotos__, ___call by value&reference__ and so on.
+This is simeple interpreter written in Scheme for a Java/C-ish language. It supports some Java language features, including __object type__, __exception throwing__, __dot operator__, __gotos__, __call by value&reference__ and so on.
 
 
 
