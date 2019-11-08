@@ -1,5 +1,5 @@
 # Overview
-This is a Scheme implementation of the Java interpreter. It supports most Java language features, including __object type__, __exception throwing__, __dot operator__, __static & non-static declaration__, and so on.
+This is simeple interpreter written in Scheme for a Java/C-ish language. It supports some Java language features, including __object type__, __exception throwing__, __dot operator__, __gotos__, ___call by value&reference__ and so on.
 
 
 
